@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 import rdflib as rdf
 from datetime import datetime
 import networkx as nx
@@ -7,7 +6,8 @@ import matplotlib.pyplot as plt
 
 FILE_NS = "NSFILE_"
 
-class CGMESNode():
+
+class CGMESNode:
     def __init__(self, id: str):
         self.id = id
         self.props = {}
@@ -62,7 +62,12 @@ LIMIT 1000
 
     return node
 
-def ascendants(graph: rdf.Graph, identifier: str, seen:list[str]=[]) -> list[str]:
+
+def ascendants(
+    graph: rdf.Graph, identifier: str, seen: list[str] = [], depth=1000
+) -> list[str]:
+    if depth == 0:
+        return []
     if identifier in seen:
         return []
 
@@ -89,14 +94,21 @@ LIMIT 10000
             if identifier.startswith("F"):
                 pass
             references.append(o.n3(graph.namespace_manager))
-            references.extend(ascendants(graph, o.n3(graph.namespace_manager), seen))
+            references.extend(
+                ascendants(graph, o.n3(graph.namespace_manager), seen, depth - 1)
+            )
 
     return references
 
-def descendants(graph: rdf.Graph, identifier: str, seen: list[str]=[]) -> list[str]:
+
+def descendants(
+    graph: rdf.Graph, identifier: str, seen: list[str] = [], depth=1000
+) -> list[str]:
+    if depth == 0:
+        return []
     if identifier in seen:
         return []
-    seen.append( identifier)
+    seen.append(identifier)
 
     query = """
 SELECT ?s ?p ?o
@@ -114,36 +126,35 @@ LIMIT 1000
         o = res.get("o")
         n3 = o.n3(graph.namespace_manager)
 
-
         if n3.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
             identifier = o.n3(graph.namespace_manager)
             if identifier.startswith("F"):
                 pass
             references.append(o.n3(graph.namespace_manager))
-            references.extend(descendants(graph, o.n3(graph.namespace_manager), seen))
+            references.extend(
+                descendants(graph, o.n3(graph.namespace_manager), seen, depth - 1)
+            )
 
     return references
 
-def main():
 
+def main():
     graph = rdf.Graph()
 
     # graph.bind("cim", rdf.Namespace("http://iec.ch/TC57/2013/CIM-schema-cim16#"))
     # graph.bind("rdf", rdf.RDF)
 
-
     start = datetime.now()
 
-    small_grid_folder = Path("./samples/smallgrid")
-    # small_grid_folder = Path("./samples/realgrid")
+    # small_grid_folder = Path("./samples/smallgrid")
+    small_grid_folder = Path("./samples/realgrid")
     for f in small_grid_folder.glob("*.xml"):
         print(f)
         graph.parse(f)
-        graph.bind(FILE_NS+f.name, f"file://{f.absolute()}#")
+        graph.bind(FILE_NS + f.name, f"file://{f.absolute()}#")
 
     stop = datetime.now()
     print(f"loading duration: {stop - start}")
-
 
     with open("./query.rq") as qf:
         prop_query = qf.read()
@@ -151,10 +162,18 @@ def main():
     with open("./query_up.rq") as qf:
         asc_query = qf.read()
 
-    identifier = FILE_NS + '20171002T0930Z_BE_EQ_2.xml:_17086487-56ba-4979-b8de-064025a6b4da'
-    # identifier = FILE_NS + 'CGMES_v2.4.15_RealGridTestConfiguration_EQ_V2.xml:_426798065_ACLS'
+    # identifier = (
+    #     FILE_NS + "20171002T0930Z_BE_EQ_2.xml:_17086487-56ba-4979-b8de-064025a6b4da"
+    # )
+    identifier = FILE_NS + 'CGMES_v2.4.15_RealGridTestConfiguration_EQ_V2.xml:_426798065_ACLS'
     # print(properties(graph, identifier))
-    all = [identifier] + descendants(graph, identifier) + ascendants(graph, identifier)
+    all = list(
+        set(
+            [identifier]
+            + descendants(graph, identifier, depth=1000)
+            + ascendants(graph, identifier, depth=1000)
+        )
+    )
     # print(descendants(graph, identifier))
     # print(ascendants(graph, identifier))
 
@@ -162,16 +181,58 @@ def main():
 
     g.add_nodes_from(all)
 
+    props = {}
     for identifier in all:
         n = properties(graph, identifier)
+        props[identifier] = n
         for p in n.props:
             g.nodes[identifier][p] = n.props[p]
 
         for c in n.children:
+            if n.children[c] not in all:
+                continue
             g.add_edge(identifier, n.children[c], rel=c)
 
-    nx.nx_pydot.graphviz_layout(g)
-    plt.savefig("graph.png")
+    print(props.values())
+    labels = {
+        k: n.props.get("rdf:type", "")
+        + " - "
+        + n.props.get("cim:IdentifiedObject.name", k)
+        + "\n"
+        + "\n".join(
+            f"{k.split('.')[-1]}={v}"
+            for k, v in n.props.items()
+            if k != "cim:IdentifiedObject.name" and k != "rdf:type"
+        )
+        for k, n in props.items()
+    }
+
+    # pos = nx.planar_layout(g)
+    h = nx.Graph(g)
+    pos = nx.planar_layout(h)
+    pos = nx.spring_layout(h, pos=pos)
+    pos = nx.spring_layout(h)
+    # nx.draw_networkx(g, pos, with_labels=False)
+    # nx.draw_networkx_labels(g, pos, labels)
+
+    # nx.nx_pydot.graphviz_layout(g)
+    # p = nx.nx_pydot.to_pydot(g)
+    # a = nx.nx_agraph.to_agraph(g)
+    # a.draw("graph.svg", args="-Gnodesep=0.01 -Gfontsize=1", prog="dot")
+    # a.draw("graph.svg", prog="sfdp")
+    # a.draw("graph.svg", prog="neato", labels=labels)
+    # p.write_dot("graph.dot")
+    nx.draw(
+        g,
+        pos=pos,
+        node_shape="s",
+        node_color="#aaaaaa",
+        labels=labels,
+        arrows=True,
+        arrowstyle="-|>",
+        font_size=3,
+    )
+    plt.savefig("graph.svg")
 
 
 if __name__ == "__main__":

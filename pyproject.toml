@@ -8,6 +8,7 @@ dependencies = [
     "matplotlib>=3.10.7",
     "networkx>=3.5",
     "pydot>=4.0.1",
+    "pygraphviz>=1.14",
     "rdflib>=7.4.0",
     "scipy>=1.16.3",
 ]
