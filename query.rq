@@ -1,0 +1,8 @@
+# PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?s ?p ?o
+WHERE {
+  VALUES ?s { $ID }
+?s ?p ?o.
+}
+LIMIT 1000
