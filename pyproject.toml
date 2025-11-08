@@ -1,19 +1,13 @@
 [project]
 name = "cgmes-explorer"
 version = "0.1.0"
-description = ""
-authors = [
-    {name = "Guillaume Verger",email = "verger.guillaume@gmail.com"}
-]
+description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "rdflib (>=7.4.0,<8.0.0)",
-    "networkx (>=3.5,<4.0)",
-    "matplotlib (>=3.10.7,<4.0.0)"
+    "matplotlib>=3.10.7",
+    "networkx>=3.5",
+    "pydot>=4.0.1",
+    "rdflib>=7.4.0",
+    "scipy>=1.16.3",
 ]
-
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"

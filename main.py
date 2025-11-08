@@ -3,6 +3,7 @@ from typing import Any
 import rdflib as rdf
 from datetime import datetime
 import networkx as nx
+import matplotlib.pyplot as plt
 
 FILE_NS = "NSFILE_"
 
@@ -169,7 +170,8 @@ def main():
         for c in n.children:
             g.add_edge(identifier, n.children[c], rel=c)
 
-    nx.draw_networkx(g)
+    nx.nx_pydot.graphviz_layout(g)
+    plt.savefig("graph.png")
 
 
 if __name__ == "__main__":
