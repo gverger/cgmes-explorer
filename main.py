@@ -1,8 +1,11 @@
 import networkx as nx
 import cgmes
 import matplotlib.pyplot as plt
+import graphs
 
-grid = "large"
+grid = "small"
+# grid = "large"
+
 
 def main():
     if grid == "small":
@@ -43,19 +46,10 @@ def main():
                 continue
             g.add_edge(identifier, n.children[c], rel=c)
 
-    print(props.values())
-    labels = {
-        k: n.props.get("rdf:type", "")
-        + " - "
-        + n.props.get("cim:IdentifiedObject.name", k)
-        + "\n"
-        + "\n".join(
-            f"{k.split('.')[-1]}={v}"
-            for k, v in n.props.items()
-            if k != "cim:IdentifiedObject.name" and k != "rdf:type"
-        )
-        for k, n in props.items()
-    }
+    for nid, n in props.items():
+        print(graphs.node_details(nid, n))
+
+    labels = {nid: f"{graphs.node_details(nid, n)}" for nid, n in props.items()}
 
     # pos = nx.planar_layout(g)
     h = nx.Graph(g)
@@ -81,6 +75,7 @@ def main():
         arrows=True,
         arrowstyle="-|>",
         font_size=3,
+        horizontalalignment="left",
     )
     plt.savefig("graph.svg")
 

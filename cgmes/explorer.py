@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+
 import rdflib as rdf
 from rdflib import term
 from rdflib.query import ResultRow
@@ -11,11 +12,27 @@ def identifier_for(filename: str, rdfid: str) -> str:
     return FILE_NS + f"{filename}:{rdfid}"
 
 
+def file_for(identifier: str) -> str:
+    assert identifier.startswith(FILE_NS)
+    assert ":" in identifier
+
+    text = identifier.removeprefix(FILE_NS)
+    return text.split(":")[0]
+
+
+def rdfid_for(identifier: str) -> str:
+    assert identifier.startswith(FILE_NS)
+    assert ":" in identifier
+
+    text = identifier.removeprefix(FILE_NS)
+    return text.split(":")[1]
+
+
 class CGMESNode:
     def __init__(self, id: str):
         self.id = id
-        self.props = {}
-        self.children = {}
+        self.props: dict[str, str] = {}
+        self.children: dict[str, str] = {}
 
     def add_value(self, key, value):
         self.props[key] = value
@@ -26,13 +43,13 @@ class CGMESNode:
     def __repr__(self) -> str:
         rep = f"{self.id}:\n"
         if len(self.props) > 1:
-            rep += "Properties:\n"
+            rep += "  Properties:\n"
             for key in sorted(self.props.keys()):
-                rep += f"  {key}: {self.props[key]}\n"
-        if len(self.props) > 1:
-            rep += "Children:\n"
+                rep += f"    {key}: {self.props[key]}\n"
+        if len(self.children) > 1:
+            rep += "  Children:\n"
             for key in sorted(self.children.keys()):
-                rep += f"  {key}: {self.children[key]}\n"
+                rep += f"    {key}: {self.children[key]}\n"
 
         return rep
 
