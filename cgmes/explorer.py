@@ -89,20 +89,24 @@ class Graph:
         return node
 
     def ascendants(
-        self, identifier: str, seen: list[str] = [], depth=1000
+        self, identifier: str, seen: list[str] | None = None, depth=1000, max_seen=5
     ) -> list[str]:
+        indent = (1000 - depth) * "  "
         if depth == 0:
             return []
+        seen = seen or []
         if identifier in seen:
+            return []
+        if len(seen) >= max_seen:
             return []
 
         seen.append(identifier)
+        print(f"{indent}ascendants seen = {len(seen)}")
 
         query = """
-    SELECT ?s ?p ?o
+    SELECT ?p ?o
     WHERE {
     ?o ?p $ID.
-      VALUES ?s { $ID }
     }
     LIMIT 10000
             """
@@ -113,22 +117,33 @@ class Graph:
         for res in self.graph.query(query):
             assert isinstance(res, ResultRow)
             o = res.get("o")
-            identifier = self._n3(o)
+            childid = self._n3(o)
 
-            if identifier.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
-                references.append(identifier)
-                references.extend(self.ascendants(identifier, seen, depth - 1))
+            if childid.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
+                print(f"{indent} [loop] ascendants to go = {len(seen)}")
+                print(f"{indent}{self._n3(res.get('p'))} -> {childid}")
+                references.append(childid)
+                references.extend(self.ascendants(childid, seen, depth - 1, max_seen))
+                if len(seen) >= max_seen:
+                    return references
 
         return references
 
     def descendants(
-        self, identifier: str, seen: list[str] = [], depth=1000
+        self, identifier: str, seen: None | list[str] = None, depth=1000, max_seen=5
     ) -> list[str]:
+        indent = (1000 - depth) * "  "
+        print(f"{indent}descendants of {identifier}...")
         if depth == 0:
             return []
+        seen = seen or []
         if identifier in seen:
             return []
+        if len(seen) >= max_seen:
+            return []
+
         seen.append(identifier)
+        print(f"{indent}descendants seen = {len(seen)} : {identifier}")
 
         query = """
     SELECT ?s ?p ?o
@@ -145,11 +160,15 @@ class Graph:
         for res in self.graph.query(query):
             assert isinstance(res, rdf.query.ResultRow)
             o = res.get("o")
-            identifier = self._n3(o)
+            childid = self._n3(o)
 
-            if identifier.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
-                references.append(identifier)
-                references.extend(self.descendants(identifier, seen, depth - 1))
+            if childid.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
+                print(f"{indent}[loop] descendants to go = {len(seen)} : {childid}")
+                print(f"{indent}{self._n3(res.get('p'))} -> {childid}")
+                references.append(childid)
+                references.extend(self.descendants(childid, seen, depth - 1, max_seen))
+                if len(seen) >= max_seen:
+                    return references
 
         return references
 
@@ -162,15 +181,11 @@ class Graph:
 def load_folder(cgmes_folder: Path | str) -> Graph:
     cgmes_folder = Path(cgmes_folder)
 
-    start = datetime.now()
     graph = Graph()
 
     for f in cgmes_folder.glob("*.xml"):
         print(f"loading {f}")
         graph.graph.parse(f)
         graph.graph.bind(FILE_NS + f.name, f"file://{f.absolute()}#")
-
-    stop = datetime.now()
-    print(f"loading duration: {stop - start}")
 
     return graph
