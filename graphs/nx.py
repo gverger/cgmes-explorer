@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from cgmes.explorer import CGMESNode, file_for, rdfid_for
+from cgmes.explorer import CGMESNode, Graph
 
 
 @dataclass
@@ -20,11 +20,11 @@ class NodeDetails:
         rep = f"{self.id} (in {self.file}):\n"
         rep += f"- type = {self.type}\n"
         rep += f"- name = {self.name}\n"
-        if len(self.properties) > 1:
+        if len(self.properties) > 0:
             rep += "  Properties:\n"
             for key in sorted(self.properties.keys()):
                 rep += f"    {key}: {self.properties[key]}\n"
-        if len(self.children) > 1:
+        if len(self.children) > 0:
             rep += "  Children:\n"
             for key in sorted(self.children.keys()):
                 rep += f"    {key}: {self.children[key]}\n"
@@ -32,9 +32,9 @@ class NodeDetails:
         return rep
 
 
-def node_details(node_id: str, node: CGMESNode) -> NodeDetails:
+def node_details(graph: Graph, node: CGMESNode) -> NodeDetails:
     node_type = node.props.get("rdf:type", "").removeprefix("cim:")
-    node_name = node.props.get("cim:IdentifiedObject.name", node_id)
+    node_name = node.props.get("cim:IdentifiedObject.name", node.id)
     node_properties = {
         k: v
         for k, v in node.props.items()
@@ -42,10 +42,10 @@ def node_details(node_id: str, node: CGMESNode) -> NodeDetails:
     }
 
     return NodeDetails(
-        id=rdfid_for(node_id),
+        id=graph.rdfid_for(node.id),
         type=node_type,
         name=node_name,
-        file=file_for(node_id),
+        file=graph.file_for(node.id),
         properties=node_properties,
         children=node.children,
     )

@@ -1,11 +1,14 @@
-from datetime import datetime
-import networkx as nx
-import cgmes
-import pyvis.network as pvn
-import graphs
 import pickle
+from datetime import datetime
 from pathlib import Path
+
+import networkx as nx
+import pyvis.network as pvn
 from loguru import logger
+
+import cgmes
+import graphs
+import visu
 
 grid = "small"
 # grid = "large"
@@ -33,13 +36,14 @@ def main():
     if grid == "small":
         graph = load_cached(pickle_filename, "./samples/smallgrid")
 
-        identifier = cgmes.identifier_for(
+        identifier = graph.identifier_for(
             "20171002T0930Z_BE_EQ_2.xml", "_17086487-56ba-4979-b8de-064025a6b4da"
         )
     else:
         graph = load_cached(pickle_filename, "./samples/realgrid")
-        identifier = cgmes.identifier_for(
-            "CGMES_v2.4.15_RealGridTestConfiguration_EQ_V2.xml", "_426798065_ACLS"
+        identifier = graph.identifier_for(
+            "CGMES_v2.4.15_RealGridTestConfiguration_EQ_V2.xml",
+            "_426798065_ACLS",
             # "CGMES_v2.4.15_RealGridTestConfiguration_EQ_V2.xml", "_63_BV",
         )
     stop = datetime.now()
@@ -90,5 +94,7 @@ def main():
     pg.write_html("test.html")
     logger.info("exiting")
 
+
 if __name__ == "__main__":
-    main()
+    # main()
+    visu.run()

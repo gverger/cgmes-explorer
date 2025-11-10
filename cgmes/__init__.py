@@ -1,3 +1,3 @@
-__all__ = ["load_folder", "identifier_for"]
+__all__ = ["load_folder"]
 
-from .explorer import load_folder, identifier_for
+from .explorer import load_folder

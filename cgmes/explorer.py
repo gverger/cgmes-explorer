@@ -1,6 +1,7 @@
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
 
+from loguru import logger
 import rdflib as rdf
 from rdflib import term
 from rdflib.query import ResultRow
@@ -8,24 +9,10 @@ from rdflib.query import ResultRow
 FILE_NS = "NSFILE_"
 
 
-def identifier_for(filename: str, rdfid: str) -> str:
-    return FILE_NS + f"{filename}:{rdfid}"
-
-
-def file_for(identifier: str) -> str:
-    assert identifier.startswith(FILE_NS)
-    assert ":" in identifier
-
-    text = identifier.removeprefix(FILE_NS)
-    return text.split(":")[0]
-
-
-def rdfid_for(identifier: str) -> str:
-    assert identifier.startswith(FILE_NS)
-    assert ":" in identifier
-
-    text = identifier.removeprefix(FILE_NS)
-    return text.split(":")[1]
+@dataclass
+class FilePrefix:
+    filename: str
+    prefix: str
 
 
 class CGMESNode:
@@ -42,11 +29,11 @@ class CGMESNode:
 
     def __repr__(self) -> str:
         rep = f"{self.id}:\n"
-        if len(self.props) > 1:
+        if len(self.props) > 0:
             rep += "  Properties:\n"
             for key in sorted(self.props.keys()):
                 rep += f"    {key}: {self.props[key]}\n"
-        if len(self.children) > 1:
+        if len(self.children) > 0:
             rep += "  Children:\n"
             for key in sorted(self.children.keys()):
                 rep += f"    {key}: {self.children[key]}\n"
@@ -57,6 +44,38 @@ class CGMESNode:
 class Graph:
     def __init__(self):
         self.graph = rdf.Graph()
+        self.filenames: list[FilePrefix] = []
+        self.ids: dict[str, str] = {}
+
+    def _ids(self, identifier: str):
+        id = identifier.split(":")[1]
+        return [f"{FILE_NS}{el.prefix}:{id}" for el in self.filenames]
+
+        # if not self.ids:
+        #     self.load_ids()
+
+        # return [self.ids[identifier[identifier.index(":")+1:]]]
+
+    def load_ids(self):
+        logger.info("loading ids...")
+        self.ids = {}
+        query = """
+            SELECT ?s
+            WHERE {
+            ?s rdf:type ?o.
+            }
+            LIMIT 10000000
+            """
+
+        for res in self.graph.query(query):
+            assert isinstance(res, ResultRow)
+            if not isinstance(res["s"], rdf.URIRef):
+                continue
+            rdfid = self._n3(res["s"])
+            if rdfid.startswith(FILE_NS):
+                self.ids[rdfid.split(":")[1]] = rdfid
+        logger.info("{len(self.ids)} ids loaded")
+
 
     def properties(self, identifier: str) -> CGMESNode:
         query = """
@@ -68,7 +87,7 @@ class Graph:
     LIMIT 1000
             """
 
-        query = query.replace("$ID", identifier)
+        query = query.replace("$ID", " ".join(self._ids(identifier)))
 
         node = CGMESNode(identifier)
 
@@ -80,6 +99,7 @@ class Graph:
             o = self._n3(raw_o)
 
             if p == "rdf:type":
+                node.id = self._n3(res.get("s"))
                 node.add_value(p, o)
             elif isinstance(raw_o, rdf.Literal):
                 node.add_value(p, raw_o.value)
@@ -106,11 +126,12 @@ class Graph:
         query = """
     SELECT ?p ?o
     WHERE {
-    ?o ?p $ID.
+      VALUES ?s { $ID }
+    ?o ?p ?s.
     }
     LIMIT 10000
             """
-        query = query.replace("$ID", identifier)
+        query = query.replace("$ID", " ".join(self._ids(identifier)))
 
         references = []
 
@@ -148,12 +169,12 @@ class Graph:
         query = """
     SELECT ?s ?p ?o
     WHERE {
-      VALUES ?s { $ID }
+      VALUES ?s { $ID }.
     ?s ?p ?o.
     }
     LIMIT 1000
             """
-        query = query.replace("$ID", identifier)
+        query = query.replace("$ID", " ".join(self._ids(identifier)))
 
         references = []
 
@@ -177,6 +198,49 @@ class Graph:
             return "NONE"
         return rdf_result.n3(self.graph.namespace_manager)
 
+    def prefix_from_filename(self, filename: str) -> FilePrefix:
+        for f in self.filenames:
+            if f.filename == filename:
+                return f
+        prefix = FilePrefix(filename, f"{len(self.filenames)}")
+        self.filenames.append(prefix)
+        return prefix
+
+    def filename_from_prefix(self, prefix: str) -> FilePrefix | None:
+        for f in self.filenames:
+            if f.prefix == prefix:
+                return f
+        return None
+
+    def identifier_for(self, filename: str, rdfid: str) -> str:
+        prefix = self.prefix_from_filename(filename).prefix
+        return FILE_NS + f"{prefix}:{rdfid}"
+
+    def file_for(self, identifier: str) -> str:
+        assert identifier.startswith(FILE_NS)
+        assert ":" in identifier
+
+        text = identifier.removeprefix(FILE_NS)
+        fileprefix = self.filename_from_prefix(text.split(":")[0])
+
+        if not fileprefix:
+            logger.error("No file for prefix {}", text)
+            return ""
+
+        return fileprefix.filename
+
+    def rdfid_for(self, identifier: str) -> str:
+        assert identifier.startswith(FILE_NS)
+        assert ":" in identifier
+
+        text = identifier.removeprefix(FILE_NS)
+        return text.split(":")[1]
+
+
+NAMESPACE_ESCAPES = {
+    "(": "%28",
+    ")": "%29",
+}
 
 def load_folder(cgmes_folder: Path | str) -> Graph:
     cgmes_folder = Path(cgmes_folder)
@@ -186,6 +250,12 @@ def load_folder(cgmes_folder: Path | str) -> Graph:
     for f in cgmes_folder.glob("*.xml"):
         print(f"loading {f}")
         graph.graph.parse(f)
-        graph.graph.bind(FILE_NS + f.name, f"file://{f.absolute()}#")
+        namespace = f.absolute().as_posix()
+        for k, v in NAMESPACE_ESCAPES.items():
+            namespace = namespace.replace(k, v)
+        graph.graph.bind(
+            FILE_NS + graph.prefix_from_filename(f.name).prefix,
+            f"file://{namespace}#",
+        )
 
     return graph
