@@ -3,7 +3,7 @@ from pathlib import Path
 import pickle
 import dash
 import dash_cytoscape as cyto
-from dash import Input, Output, State, html
+from dash import Input, Output, State, dcc, html
 from loguru import logger
 
 import cgmes
@@ -170,15 +170,19 @@ def run():
         Output("graph", "elements"),
         Input("graph", "tapNode"),
         Input("resetButton", "n_clicks"),
+        Input("searchIdButton", "n_clicks"),
+        State("searchId", "value"),
         State("graph", "elements"),
     )
-    def on_click(node, resetButton, elements):
+    def on_click(node, resetButton, searchIdButton, searchId, elements):
         if dash.callback_context.triggered[0]["prop_id"] == "resetButton.n_clicks":
             if state["clicked"]:
                 if state["resetId"]:
                     return load_elements(graph, state["resetId"])
 
             return load_elements(graph, first_identifier(grid))
+        if dash.callback_context.triggered[0]["prop_id"] == "searchIdButton.n_clicks":
+            return load_elements(graph, searchId.strip())
 
         if not node:
             state["clicked"] = ""
@@ -216,7 +220,15 @@ def run():
 
     app.layout = html.Div(
         [
-            html.Div(html.Button("Click here!", id="resetButton")),
+            html.Div(
+                [
+                    html.Button("Click here!", id="resetButton"),
+                    dcc.Input(
+                        id="searchId", type="text", placeholder="RDFID", size="20em"
+                    ),
+                    html.Button("Go to ID", id="searchIdButton"),
+                ]
+            ),
             cyto.Cytoscape(
                 id="graph",
                 # layout={"name": "cose" },
