@@ -134,11 +134,18 @@ def run():
 
     app = dash.Dash(__name__)
 
-    @app.callback(Output("output", "children"), Input("graph", "mouseoverNodeData"))
+    state = {
+        "loading_more": False,
+        "clicked": "",
+        "clicked_at": datetime.now(),
+        "resetId": "",
+    }
+
+    @app.callback(Output("output", "children"), Input("graph", "selectedNodeData"))
     def on_hover(data):
         if data:
             return dash.html.Pre(
-                data["description"],
+                data[0]["description"],
                 style={
                     "background-color": "white",
                     "border": 1,
@@ -147,44 +154,69 @@ def run():
                     "padding": "1em",
                 },
             )
+        else:
+            return ""
 
-    state = {"loading_more": False, "clicked": ""}
+    @app.callback(Output("resetButton", "children"), Input("graph", "selectedNodeData"))
+    def clickEmpty(data):
+        if not data:
+            state["resetId"] = ""
+            return "Reset from start"
+        print(data)
+        state["resetId"] = data[0]["id"]
+        return f"Reset exploration from {data[0]['label']}"
 
     @app.callback(
         Output("graph", "elements"),
         Input("graph", "tapNode"),
+        Input("resetButton", "n_clicks"),
         State("graph", "elements"),
     )
-    def on_click(node, elements):
-        if node:
-            if state["clicked"] != node["data"]["id"]:
-                state["clicked"] = node["data"]["id"]
-                return elements
+    def on_click(node, resetButton, elements):
+        if dash.callback_context.triggered[0]["prop_id"] == "resetButton.n_clicks":
+            if state["clicked"]:
+                if state["resetId"]:
+                    return load_elements(graph, state["resetId"])
 
-            if state["loading_more"]:
-                return elements
-            state["loading_more"] = True
+            return load_elements(graph, first_identifier(grid))
 
-            already_present = []
-            for el in elements:
-                if "id" in el["data"]:
-                    if el["data"]["id"] != node["data"]["id"]:
-                        already_present.append(el["data"]["id"])
+        if not node:
+            state["clicked"] = ""
+            return elements
 
-            new_elements = load_elements(
-                graph, node["data"]["id"], do_not_include=already_present, depth=2
-            )
-            if new_elements:
-                for n in new_elements:
-                    n["renderedPosition"] = node["renderedPosition"]
-                new_elements.extend(elements)
-                elements = new_elements
-            state["loading_more"] = False
+        if (
+            state["clicked"] != node["data"]["id"]
+            or (datetime.now() - state["clicked_at"]).total_seconds() > 0.30
+        ):
+            state["clicked"] = node["data"]["id"]
+            state["clicked_at"] = datetime.now()
+            return elements
+
+        if state["loading_more"]:
+            return elements
+        state["loading_more"] = True
+
+        already_present = []
+        for el in elements:
+            if "id" in el["data"]:
+                if el["data"]["id"] != node["data"]["id"]:
+                    already_present.append(el["data"]["id"])
+
+        new_elements = load_elements(
+            graph, node["data"]["id"], do_not_include=already_present, depth=2
+        )
+        if new_elements:
+            for n in new_elements:
+                n["renderedPosition"] = node["renderedPosition"]
+            new_elements.extend(elements)
+            elements = new_elements
+        state["loading_more"] = False
 
         return elements
 
     app.layout = html.Div(
         [
+            html.Div(html.Button("Click here!", id="resetButton")),
             cyto.Cytoscape(
                 id="graph",
                 # layout={"name": "cose" },
@@ -235,9 +267,10 @@ def run():
                 ],
                 responsive=True,
                 boxSelectionEnabled=True,
+                wheelSensitivity=0.3,
             ),
             html.Div(id="output"),
         ]
     )
 
-    app.run(debug=True)  # , use_reloader=False)
+    app.run(debug=True, use_reloader=False)
