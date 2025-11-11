@@ -76,7 +76,6 @@ class Graph:
                 self.ids[rdfid.split(":")[1]] = rdfid
         logger.info("{len(self.ids)} ids loaded")
 
-
     def properties(self, identifier: str) -> CGMESNode:
         query = """
     SELECT ?s ?p ?o
@@ -108,21 +107,7 @@ class Graph:
 
         return node
 
-    def ascendants(
-        self, identifier: str, seen: list[str] | None = None, depth=1000, max_seen=5
-    ) -> list[str]:
-        indent = (1000 - depth) * "  "
-        if depth == 0:
-            return []
-        seen = seen or []
-        if identifier in seen:
-            return []
-        if len(seen) >= max_seen:
-            return []
-
-        seen.append(identifier)
-        print(f"{indent}ascendants seen = {len(seen)}")
-
+    def ascendants(self, identifier: str, depth=1000, max_seen=5) -> list[str]:
         query = """
     SELECT ?p ?o
     WHERE {
@@ -131,41 +116,9 @@ class Graph:
     }
     LIMIT 10000
             """
-        query = query.replace("$ID", " ".join(self._ids(identifier)))
+        return self.rec_search(query, identifier, [], depth, max_seen)
 
-        references = []
-
-        for res in self.graph.query(query):
-            assert isinstance(res, ResultRow)
-            o = res.get("o")
-            childid = self._n3(o)
-
-            if childid.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
-                print(f"{indent} [loop] ascendants to go = {len(seen)}")
-                print(f"{indent}{self._n3(res.get('p'))} -> {childid}")
-                references.append(childid)
-                references.extend(self.ascendants(childid, seen, depth - 1, max_seen))
-                if len(seen) >= max_seen:
-                    return references
-
-        return references
-
-    def descendants(
-        self, identifier: str, seen: None | list[str] = None, depth=1000, max_seen=5
-    ) -> list[str]:
-        indent = (1000 - depth) * "  "
-        print(f"{indent}descendants of {identifier}...")
-        if depth == 0:
-            return []
-        seen = seen or []
-        if identifier in seen:
-            return []
-        if len(seen) >= max_seen:
-            return []
-
-        seen.append(identifier)
-        print(f"{indent}descendants seen = {len(seen)} : {identifier}")
-
+    def descendants(self, identifier: str, depth=1000, max_seen=5) -> list[str]:
         query = """
     SELECT ?s ?p ?o
     WHERE {
@@ -174,24 +127,39 @@ class Graph:
     }
     LIMIT 1000
             """
-        query = query.replace("$ID", " ".join(self._ids(identifier)))
+        return self.rec_search(query, identifier, [], depth, max_seen)
 
-        references = []
+    def rec_search(
+        self,
+        query: str,
+        identifier: str,
+        seen: list[str],
+        depth: int,
+        max_seen: int,
+    ):
+        logger.info("rec {}, {}", identifier, seen)
+        if depth == 0:
+            return []
+        if identifier in seen:
+            return []
+        if len(seen) >= max_seen:
+            return []
 
-        for res in self.graph.query(query):
+        seen.append(identifier)
+
+        q = query.replace("$ID", " ".join(self._ids(identifier)))
+
+        for res in self.graph.query(q):
             assert isinstance(res, rdf.query.ResultRow)
             o = res.get("o")
             childid = self._n3(o)
 
             if childid.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
-                print(f"{indent}[loop] descendants to go = {len(seen)} : {childid}")
-                print(f"{indent}{self._n3(res.get('p'))} -> {childid}")
-                references.append(childid)
-                references.extend(self.descendants(childid, seen, depth - 1, max_seen))
+                self.rec_search(query, childid, seen, depth - 1, max_seen)
                 if len(seen) >= max_seen:
-                    return references
+                    return seen
 
-        return references
+        return seen
 
     def _n3(self, rdf_result: term.Identifier | None) -> str:
         if not rdf_result:
@@ -241,6 +209,7 @@ NAMESPACE_ESCAPES = {
     "(": "%28",
     ")": "%29",
 }
+
 
 def load_folder(cgmes_folder: Path | str) -> Graph:
     cgmes_folder = Path(cgmes_folder)

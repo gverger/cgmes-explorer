@@ -34,7 +34,7 @@ class NodeDetails:
 
 def node_details(graph: Graph, node: CGMESNode) -> NodeDetails:
     node_type = node.props.get("rdf:type", "").removeprefix("cim:")
-    node_name = node.props.get("cim:IdentifiedObject.name", node.id)
+    node_name = node.props.get("cim:IdentifiedObject.name", node.id.split(":")[-1])
     node_properties = {
         k: v
         for k, v in node.props.items()

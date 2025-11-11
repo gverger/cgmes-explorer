@@ -1,3 +1,3 @@
-__all__ = ["load_folder"]
+__all__ = ["load_folder", "Graph"]
 
-from .explorer import load_folder
+from .explorer import load_folder, Graph
