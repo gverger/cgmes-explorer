@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 import pickle
+import random
 import dash
 import dash_cytoscape as cyto
 from dash import Input, Output, State, dcc, html
@@ -8,11 +9,12 @@ from loguru import logger
 
 import cgmes
 import graphs
+from visu import icons
 
 grid = "small"
 # grid = "large"
 # grid = "elia"
-max_nodes_one_way = 10
+max_nodes_one_way = 100
 
 
 def load_cached(pickle_filename, folder):
@@ -105,13 +107,14 @@ def load_elements(
     for identifier, n in nodes.items():
         details = graphs.node_details(graph, n)
         logger.info("{}:\n n={}\ndetails={}", identifier, n, details)
-        node = dict(
-            data=dict(
+        node = {
+            "data": dict(
                 id=identifier.split(":")[-1],
-                label=f"{details.name} [{details.type}]",
+                label=f"{details.name}\n[{details.type}]",
                 description=f"{details}",
-            )
-        )
+            ),
+            "classes": details.type,
+        }
         # if node["data"]["id"] not in do_not_include:
         elements.append(node)
 
@@ -129,6 +132,12 @@ def load_elements(
 def run():
     graph = load_graph()
     elements = load_elements(graph, first_identifier(grid))
+    for e in elements:
+        if "id" in e["data"]:
+            e["position"] = {
+                "x": random.randint(0, 1000),
+                "y": random.randint(0, 1000),
+            }
 
     cyto.load_extra_layouts()
 
@@ -162,7 +171,6 @@ def run():
         if not data:
             state["resetId"] = ""
             return "Reset from start"
-        print(data)
         state["resetId"] = data[0]["id"]
         return f"Reset exploration from {data[0]['label']}"
 
@@ -218,6 +226,75 @@ def run():
 
         return elements
 
+    img_stylesheet = [
+        {
+            "selector": f"node.{t}",
+            "style": {
+                "border-width": 0,
+                "background-image": icons.images(t),
+            },
+        }
+        for t in icons.Images
+    ]
+
+    cs = cyto.Cytoscape(
+        id="graph",
+        # layout={"name": "cose" },
+        layout={"name": "cose-bilkent", "idealEdgeLength": 64, "randomize": False},
+        # style={"width": "100%", "height": "1000px"},
+        style={
+            "position": "absolute",
+            "width": "100%",
+            "height": "100%",
+            "z-index": 1,
+        },
+        elements=elements,
+        stylesheet=[
+            {
+                "selector": "edge",
+                "style": {
+                    "curve-style": "bezier",
+                    "target-arrow-shape": "triangle",
+                },
+            },
+            {
+                "selector": "node",
+                "style": {
+                    "label": "data(label)",
+                    "text-valign": "bottom",
+                    "text-halign": "center",
+                    "text-margin-y": 3,
+                    "font-size": 8,
+                    "text-wrap": "wrap",
+                    "text-background-color": "white",
+                    "text-background-opacity": 0.5,
+                    "text-background-padding": 2,
+                    # "text-opacity": 255,
+                    "shape": "rectangle",
+                    "background-color": "white",
+                    "overlay-color": "blue",
+                    # "border-width": 1,
+                    # "border-color": "blue",
+                    # "outline-width": 2,
+                    "border-width": 1,
+                    "background-fit": "cover",
+                    "padding": "5px",
+                },
+            },
+            {
+                "selector": "node:selected",
+                "style": {
+                    "border-color": "blue",
+                    "border-width": 3,
+                },
+            },
+        ]
+        + img_stylesheet,
+        responsive=True,
+        boxSelectionEnabled=True,
+        wheelSensitivity=0.3,
+    )
+
     app.layout = html.Div(
         [
             html.Div(
@@ -229,60 +306,9 @@ def run():
                     html.Button("Go to ID", id="searchIdButton"),
                 ]
             ),
-            cyto.Cytoscape(
-                id="graph",
-                # layout={"name": "cose" },
-                layout={"name": "cose-bilkent", "idealEdgeLength": 64},
-                # style={"width": "100%", "height": "1000px"},
-                style={
-                    "position": "absolute",
-                    "width": "100%",
-                    "height": "100%",
-                    "z-index": 1,
-                },
-                elements=elements,
-                stylesheet=[
-                    {
-                        "selector": "edge",
-                        "style": {
-                            "curve-style": "bezier",
-                            "target-arrow-shape": "triangle",
-                        },
-                    },
-                    {
-                        "selector": "node",
-                        "style": {
-                            "label": "data(label)",
-                            "text-valign": "bottom",
-                            "text-halign": "center",
-                            "text-margin-y": 5,
-                            "font-size": 8,
-                            "text-background-color": "white",
-                            "text-background-opacity": 0.5,
-                            "text-background-padding": 2,
-                            # "text-opacity": 255,
-                            "shape": "rectangle",
-                            "background-color": "white",
-                            "overlay-color": "blue",
-                            "border-width": 1,
-                            # "border-color": "blue",
-                            # "outline-width": 2,
-                        },
-                    },
-                    {
-                        "selector": "node:selected",
-                        "style": {
-                            "border-color": "blue",
-                            "border-width": 3,
-                        },
-                    },
-                ],
-                responsive=True,
-                boxSelectionEnabled=True,
-                wheelSensitivity=0.3,
-            ),
+            cs,
             html.Div(id="output"),
         ]
     )
 
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=True)  # , use_reloader=False)
