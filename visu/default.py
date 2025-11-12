@@ -35,6 +35,7 @@ def load_cached(pickle_filename, folder):
 def first_identifier(grid: str) -> str:
     if grid == "small":
         identifier = "_17086487-56ba-4979-b8de-064025a6b4da"
+        identifier = "_87f7002b-056f-4a6a-a872-1744eea757e3"
     elif grid == "elia":
         # identifier = "_d68b6a7e-09cd-e6e3-9d08-ec5501d60acf"
         # identifier = "_b8e17237e0ca4fca9e4e285b80ab30d0",

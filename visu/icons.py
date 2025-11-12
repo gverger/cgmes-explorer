@@ -1,6 +1,5 @@
 import base64
 from pathlib import Path
-import sys
 import yaml
 
 
@@ -20,7 +19,6 @@ with open("visu/assets/icons.yml", "r") as f:
 
 
 def images(el_type: str):
-    print(el_type)
     if el_type in Images:
         return datauri((Path("visu/assets") / Images[el_type]).as_posix())
     return Images.get(el_type, None)

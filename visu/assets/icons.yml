@@ -29,3 +29,7 @@ types:
     TopologicalIsland: "island.png"
     BusbarSection: "busbar.png"
     Substation: "substation.png"
+    EnergyConsumer: "factory.png"
+    LoadAggregate: "factory.png"
+    LoadStatic: "factory.png"
+    LoadResponseCharacteristic: "factory.png"
