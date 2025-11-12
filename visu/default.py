@@ -132,12 +132,6 @@ def load_elements(
 def run():
     graph = load_graph()
     elements = load_elements(graph, first_identifier(grid))
-    for e in elements:
-        if "id" in e["data"]:
-            e["position"] = {
-                "x": random.randint(0, 1000),
-                "y": random.randint(0, 1000),
-            }
 
     cyto.load_extra_layouts()
 
@@ -149,6 +143,16 @@ def run():
         "clicked_at": datetime.now(),
         "resetId": "",
     }
+
+    @app.callback(Output("graph", "layout"), Input("autoLayoutButton", "n_clicks"))
+    def auto_layout(button):
+        if button:
+            return {
+                "name": "cose-bilkent",
+                "idealEdgeLength": 96,
+                "randomize": False,
+                "updateID": datetime.now(),
+            }
 
     @app.callback(Output("output", "children"), Input("graph", "selectedNodeData"))
     def on_hover(data):
@@ -240,7 +244,7 @@ def run():
     cs = cyto.Cytoscape(
         id="graph",
         # layout={"name": "cose" },
-        layout={"name": "cose-bilkent", "idealEdgeLength": 96, "randomize": False},
+        layout={"name": "cose-bilkent", "idealEdgeLength": 96, "randomize": True},
         # style={"width": "100%", "height": "1000px"},
         style={
             "position": "absolute",
@@ -304,6 +308,7 @@ def run():
                         id="searchId", type="text", placeholder="RDFID", size="20em"
                     ),
                     html.Button("Go to ID", id="searchIdButton"),
+                    html.Button("Auto-Layout", id="autoLayoutButton"),
                 ]
             ),
             cs,
