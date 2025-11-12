@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from loguru import logger
 import rdflib as rdf
+from loguru import logger
 from rdflib import term
 from rdflib.query import ResultRow
 
@@ -206,26 +206,17 @@ class Graph:
         return text.split(":")[1]
 
 
-NAMESPACE_ESCAPES = {
-    "(": "%28",
-    ")": "%29",
-}
-
-
 def load_folder(cgmes_folder: Path | str) -> Graph:
     cgmes_folder = Path(cgmes_folder)
 
     graph = Graph()
 
     for f in cgmes_folder.glob("*.xml"):
-        print(f"loading {f}")
+        logger.info(f"loading {f}")
         graph.graph.parse(f)
-        namespace = f.absolute().as_posix()
-        for k, v in NAMESPACE_ESCAPES.items():
-            namespace = namespace.replace(k, v)
         graph.graph.bind(
             FILE_NS + graph.prefix_from_filename(f.name).prefix,
-            f"{Path(namespace).as_uri()}#",
+            f"{f.absolute().as_uri()}#",
         )
 
     return graph
