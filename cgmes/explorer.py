@@ -225,7 +225,7 @@ def load_folder(cgmes_folder: Path | str) -> Graph:
             namespace = namespace.replace(k, v)
         graph.graph.bind(
             FILE_NS + graph.prefix_from_filename(f.name).prefix,
-            f"file://{namespace}#",
+            f"{Path(namespace).as_uri()}#",
         )
 
     return graph
