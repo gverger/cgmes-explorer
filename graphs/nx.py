@@ -11,7 +11,7 @@ class NodeDetails:
     name: str
     file: str
     properties: dict[str, Any]
-    children: dict[str, str]
+    children: list[tuple[str, str]]
 
     def title(self) -> str:
         return f"{self.type} - {self.name}"
@@ -26,8 +26,8 @@ class NodeDetails:
                 rep += f"    {key}: {self.properties[key]}\n"
         if len(self.children) > 0:
             rep += "  Children:\n"
-            for key in sorted(self.children.keys()):
-                rep += f"    {key}: {self.children[key]}\n"
+            for child in sorted(self.children):
+                rep += f"    {child[0]}: {child[1]}\n"
 
         return rep
 

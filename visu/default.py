@@ -119,7 +119,7 @@ def load_elements(
         elements.append(node)
 
         for c in n.children:
-            childid = n.children[c].split(":")[1]
+            childid = c[1].split(":")[1]
             if childid not in all:
                 continue
             if node["data"]["id"] in do_not_include and childid in do_not_include:
@@ -240,7 +240,7 @@ def run():
     cs = cyto.Cytoscape(
         id="graph",
         # layout={"name": "cose" },
-        layout={"name": "cose-bilkent", "idealEdgeLength": 64, "randomize": False},
+        layout={"name": "cose-bilkent", "idealEdgeLength": 96, "randomize": False},
         # style={"width": "100%", "height": "1000px"},
         style={
             "position": "absolute",
@@ -284,8 +284,8 @@ def run():
             {
                 "selector": "node:selected",
                 "style": {
-                    "border-color": "blue",
-                    "border-width": 3,
+                    "outline-color": "blue",
+                    "outline-width": 3,
                 },
             },
         ]
@@ -311,4 +311,4 @@ def run():
         ]
     )
 
-    app.run(debug=True)  # , use_reloader=False)
+    app.run(debug=True, use_reloader=False)

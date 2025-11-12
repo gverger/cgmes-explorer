@@ -19,13 +19,13 @@ class CGMESNode:
     def __init__(self, id: str):
         self.id = id
         self.props: dict[str, str] = {}
-        self.children: dict[str, str] = {}
+        self.children: list[tuple[str, str]] = []
 
     def add_value(self, key, value):
         self.props[key] = value
 
     def add_child(self, filiation, child):
-        self.children[filiation] = child
+        self.children.append((filiation, child))
 
     def __repr__(self) -> str:
         rep = f"{self.id}:\n"
@@ -35,8 +35,8 @@ class CGMESNode:
                 rep += f"    {key}: {self.props[key]}\n"
         if len(self.children) > 0:
             rep += "  Children:\n"
-            for key in sorted(self.children.keys()):
-                rep += f"    {key}: {self.children[key]}\n"
+            for child in sorted(self.children):
+                rep += f"    {child[0]}: {child[1]}\n"
 
         return rep
 
@@ -157,6 +157,7 @@ class Graph:
             if childid.startswith(FILE_NS) and isinstance(o, rdf.URIRef):
                 self.rec_search(query, childid, seen, depth - 1, max_seen)
                 if len(seen) >= max_seen:
+                    logger.warning("max nodes reached. results will be troncated")
                     return seen
 
         return seen
