@@ -81,10 +81,11 @@ def load_graph() -> cgmes.Graph:
 def load_elements(
     graph: cgmes.Graph,
     identifier: str,
-    do_not_include: list[str] | None = None,
+    already_present: list[str] | None = None,
     depth=1000,
 ):
-    do_not_include = do_not_include or []
+
+    already_present = already_present or []
     identifier = ":" + identifier
     all = [
         found.split(":")[1]
@@ -97,34 +98,37 @@ def load_elements(
     logger.info(f"found {len(all)} nodes")
     logger.info(all)
 
-    all = [i for i in all if i not in do_not_include]
+    all = list(set(all + already_present))
 
     logger.info("getting properties...")
     nodes = {nid: graph.properties(":" + nid) for nid in all}
     logger.info("done visu")
 
     elements = []
+    print(f"already_present = {already_present}")
     for identifier, n in nodes.items():
-        details = graphs.node_details(graph, n)
-        logger.info("{}:\n n={}\ndetails={}", identifier, n, details)
-        node = {
-            "data": dict(
-                id=identifier.split(":")[-1],
-                label=f"{details.name}\n[{details.type}]",
-                description=f"{details}",
-            ),
-            "classes": details.type,
-        }
-        # if node["data"]["id"] not in do_not_include:
-        elements.append(node)
+        nodeid = identifier.split(":")[-1]
+        if identifier not in already_present:
+            details = graphs.node_details(graph, n)
+            logger.info("{}:\n n={}\ndetails={}", identifier, n, details)
+            node = {
+                "data": dict(
+                    id=nodeid,
+                    label=f"{details.name}\n[{details.type}]",
+                    description=f"{details}",
+                ),
+                "classes": details.type,
+            }
+            elements.append(node)
 
         for c in n.children:
             childid = c[1].split(":")[1]
             if childid not in all:
                 continue
-            if node["data"]["id"] in do_not_include and childid in do_not_include:
+            if nodeid in already_present and childid in already_present:
                 continue
-            elements.append(dict(data=dict(source=identifier, target=childid)))
+
+            elements.append(dict(data=dict(source=nodeid, target=childid)))
 
     return elements
 
@@ -146,13 +150,13 @@ def run():
 
     @app.callback(Output("graph", "layout"), Input("autoLayoutButton", "n_clicks"))
     def auto_layout(button):
-        if button:
-            return {
-                "name": "cose-bilkent",
-                "idealEdgeLength": 96,
-                "randomize": False,
-                "updateID": datetime.now(),
-            }
+        return {
+            "name": "cose-bilkent",
+            "idealEdgeLength": 96,
+            "randomize": False,
+            # "quality": "proof",
+            "updateID": datetime.now(),
+        }
 
     @app.callback(Output("output", "children"), Input("graph", "selectedNodeData"))
     def on_hover(data):
@@ -215,11 +219,10 @@ def run():
         already_present = []
         for el in elements:
             if "id" in el["data"]:
-                if el["data"]["id"] != node["data"]["id"]:
-                    already_present.append(el["data"]["id"])
+                already_present.append(el["data"]["id"])
 
         new_elements = load_elements(
-            graph, node["data"]["id"], do_not_include=already_present, depth=2
+            graph, node["data"]["id"], already_present=already_present, depth=2
         )
         if new_elements:
             for n in new_elements:
@@ -244,7 +247,8 @@ def run():
     cs = cyto.Cytoscape(
         id="graph",
         # layout={"name": "cose" },
-        layout={"name": "cose-bilkent", "idealEdgeLength": 96, "randomize": True},
+        # layout={"name": "cose-bilkent", "idealEdgeLength": 96, "randomize": True},
+        layout={"name": "fcose", "idealEdgeLength": 96, "randomize": True},
         # style={"width": "100%", "height": "1000px"},
         style={
             "position": "absolute",

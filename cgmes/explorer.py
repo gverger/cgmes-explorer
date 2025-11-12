@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import functools
 from pathlib import Path
 
 import rdflib as rdf
@@ -76,6 +77,7 @@ class Graph:
                 self.ids[rdfid.split(":")[1]] = rdfid
         logger.info("{len(self.ids)} ids loaded")
 
+    @functools.cache
     def properties(self, identifier: str) -> CGMESNode:
         query = """
     SELECT ?s ?p ?o
