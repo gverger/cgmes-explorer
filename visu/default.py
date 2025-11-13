@@ -169,7 +169,7 @@ def run():
                     "border": 1,
                     "paddingLeft": "1em",
                 },
-                className="overflow-scroll",
+                className="overflow-auto",
             )
         else:
             return ""
@@ -321,7 +321,7 @@ def run():
                 className="mb-3",
             ),
             html.Hr(),
-            html.Div(id="output", className="small overflow-scroll"),
+            html.Div(id="output", className="small overflow-auto"),
         ],
         style={
             "position": "fixed",
