@@ -27,7 +27,7 @@ class NodeDetails:
         if len(self.children) > 0:
             rep += "  Children:\n"
             for child in sorted(self.children):
-                rep += f"    {child[0]}: {child[1]}\n"
+                rep += f"    {child[0]}: {child[1].split(":")[-1]}\n"
 
         return rep
 

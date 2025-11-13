@@ -1,8 +1,10 @@
+import pickle
 from datetime import datetime
 from pathlib import Path
-import pickle
+
 import dash
 import dash_cytoscape as cyto
+import dash_bootstrap_components as dbc
 from dash import Input, Output, State, dcc, html
 from loguru import logger
 
@@ -138,7 +140,7 @@ def run():
 
     cyto.load_extra_layouts()
 
-    app = dash.Dash()
+    app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
     state = {
         "loading_more": False,
@@ -165,10 +167,9 @@ def run():
                 style={
                     "backgroundColor": "white",
                     "border": 1,
-                    "zIndex": 10,
-                    "position": "absolute",
-                    "padding": "1em",
+                    "paddingLeft": "1em",
                 },
+                className="overflow-scroll",
             )
         else:
             return ""
@@ -250,10 +251,9 @@ def run():
         layout={"name": "fcose", "idealEdgeLength": 96, "randomize": True},
         # style={"width": "100%", "height": "1000px"},
         style={
-            "position": "absolute",
+            # "position": "absolute",
             "width": "100%",
             "height": "100%",
-            "zIndex": 1,
         },
         elements=elements,
         stylesheet=[
@@ -304,21 +304,54 @@ def run():
         wheelSensitivity=0.3,
     )
 
-    app.layout = html.Div(
+    sidebar = html.Div(
         [
-            html.Div(
+            html.H2("CGMES Explorer", className="display-4"),
+            html.Hr(),
+            dbc.Button(
+                "Click here!", id="resetButton", className="mb-3", color="primary"
+            ),
+            dbc.InputGroup(
                 [
-                    html.Button("Click here!", id="resetButton"),
-                    dcc.Input(
+                    dbc.Input(
                         id="searchId", type="text", placeholder="RDFID", size="20em"
                     ),
-                    html.Button("Go to ID", id="searchIdButton"),
-                    html.Button("Auto-Layout", id="autoLayoutButton"),
-                ]
+                    dbc.Button("Go to ID", id="searchIdButton", color="primary"),
+                ],
+                className="mb-3",
             ),
-            cs,
-            html.Div(id="output"),
-        ]
+            html.Hr(),
+            html.Div(id="output", className="small overflow-scroll"),
+        ],
+        style={
+            "position": "fixed",
+            "top": 0,
+            "left": 0,
+            "bottom": 0,
+            "width": "40rem",
+            "padding": "2rem 1rem",
+            "backgroundColor": "#f8f9fa",
+        },
     )
+
+    content = html.Div(
+        [
+            cs,
+            dbc.Button(
+                "Auto-Layout",
+                id="autoLayoutButton",
+                color="outline-primary",
+                className="m-3 position-absolute top-0 end-0",
+            ),
+        ],
+        style={
+            "marginLeft": "40rem",
+            "marginRight": "0rem",
+            "padding": "0rem",
+            "height": "100vh",
+        },
+    )
+
+    app.layout = html.Div([sidebar, content])
 
     app.run(debug=True, use_reloader=False)
