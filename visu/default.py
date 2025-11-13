@@ -1,7 +1,6 @@
 from datetime import datetime
 from pathlib import Path
 import pickle
-import random
 import dash
 import dash_cytoscape as cyto
 from dash import Input, Output, State, dcc, html
@@ -85,7 +84,6 @@ def load_elements(
     already_present: list[str] | None = None,
     depth=1000,
 ):
-
     already_present = already_present or []
     identifier = ":" + identifier
     all = [
@@ -140,7 +138,7 @@ def run():
 
     cyto.load_extra_layouts()
 
-    app = dash.Dash(__name__)
+    app = dash.Dash()
 
     state = {
         "loading_more": False,
@@ -165,9 +163,9 @@ def run():
             return dash.html.Pre(
                 data[0]["description"],
                 style={
-                    "background-color": "white",
+                    "backgroundColor": "white",
                     "border": 1,
-                    "z-index": 10,
+                    "zIndex": 10,
                     "position": "absolute",
                     "padding": "1em",
                 },
@@ -255,7 +253,7 @@ def run():
             "position": "absolute",
             "width": "100%",
             "height": "100%",
-            "z-index": 1,
+            "zIndex": 1,
         },
         elements=elements,
         stylesheet=[
@@ -269,6 +267,8 @@ def run():
             {
                 "selector": "node",
                 "style": {
+                    "width": 10,
+                    "height": 10,
                     "label": "data(label)",
                     "text-valign": "bottom",
                     "text-halign": "center",
