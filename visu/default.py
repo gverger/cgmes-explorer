@@ -180,7 +180,7 @@ def run():
                         children=[
                             t,
                             dbc.Switch(
-                                id={"index": t, "type": "typeFilter" },
+                                id={"index": t, "type": "typeFilter"},
                                 value=t not in hidden_types,
                             ),
                         ],
@@ -277,7 +277,7 @@ def run():
             new_elements.extend(elements)
             elements = new_elements
         state["loading_more"] = False
-        
+
         return elements
 
     @app.callback(
@@ -303,10 +303,7 @@ def run():
                 if "id" in d and d["id"] not in hidden_ids:
                     els.append(e)
                 if "source" in d:
-                    if (
-                        d["source"] not in hidden_ids
-                        and d["target"] not in hidden_ids
-                    ):
+                    if d["source"] not in hidden_ids and d["target"] not in hidden_ids:
                         els.append(e)
 
             all_elements = els
@@ -336,10 +333,7 @@ def run():
             d = e["data"]
             if "id" in d and d["id"] not in displayed_node_ids:
                 new_els.append(e)
-            if (
-                "source" in d
-                and (d["source"], d["target"]) not in displayed_edge_ids
-            ):
+            if "source" in d and (d["source"], d["target"]) not in displayed_edge_ids:
                 new_els.append(e)
 
         return new_els
