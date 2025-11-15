@@ -5,7 +5,8 @@ from pathlib import Path
 import dash
 import dash_cytoscape as cyto
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, dcc, html
+import dash_daq as daq
+from dash import ALL, Input, Output, State, dcc, html
 from loguru import logger
 
 import cgmes
@@ -117,6 +118,7 @@ def load_elements(
                     id=nodeid,
                     label=f"{details.name}\n[{details.type}]",
                     description=f"{details}",
+                    type=details.type,
                 ),
                 "classes": details.type,
             }
@@ -137,6 +139,7 @@ def load_elements(
 def run():
     graph = load_graph()
     elements = load_elements(graph, first_identifier(grid))
+    print("initial elements", elements)
 
     cyto.load_extra_layouts()
 
@@ -148,6 +151,45 @@ def run():
         "clicked_at": datetime.now(),
         "resetId": "",
     }
+
+    @app.callback(
+        Output("hiddenTypes", "data"),
+        Input({"type": "typeFilter", "index": ALL}, "value"),
+        State({"type": "typeFilter", "index": ALL}, "id"),
+    )
+    def show_hide_type(filtered_type, ids):
+        res = [t["index"] for i, t in enumerate(ids) if not filtered_type[i]]
+        return res
+
+    @app.callback(
+        Output("typeFilterList", "children"),
+        Input("allElements", "data"),
+        Input("hiddenTypes", "data"),
+    )
+    def update_filters(elements, hidden_types):
+        hidden_types = hidden_types or []
+        types = sorted(
+            list(set([e["data"]["type"] for e in elements if "type" in e["data"]]))
+        )
+        return [
+            html.Li(
+                className="list-group-item",
+                children=[
+                    html.Label(
+                        htmlFor=f'{{"index":"{t}","type":"typeFilter"}}',
+                        className="d-flex justify-content-between align-items-center",
+                        children=[
+                            t,
+                            dbc.Switch(
+                                id={"index": t, "type": "typeFilter" },
+                                value=t not in hidden_types,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+            for t in types
+        ]
 
     @app.callback(Output("graph", "layout"), Input("autoLayoutButton", "n_clicks"))
     def auto_layout(button):
@@ -183,14 +225,20 @@ def run():
         return f"Reset exploration from {data[0]['label']}"
 
     @app.callback(
-        Output("graph", "elements"),
+        Output("allElements", "data"),
         Input("graph", "tapNode"),
         Input("resetButton", "n_clicks"),
         Input("searchIdButton", "n_clicks"),
         State("searchId", "value"),
-        State("graph", "elements"),
+        State("allElements", "data"),
     )
-    def on_click(node, resetButton, searchIdButton, searchId, elements):
+    def on_click(
+        node,
+        resetButton,
+        searchIdButton,
+        searchId,
+        elements,
+    ):
         if dash.callback_context.triggered[0]["prop_id"] == "resetButton.n_clicks":
             if state["clicked"]:
                 if state["resetId"]:
@@ -202,7 +250,7 @@ def run():
 
         if not node:
             state["clicked"] = ""
-            return elements
+            return dash.no_update
 
         if (
             state["clicked"] != node["data"]["id"]
@@ -230,8 +278,72 @@ def run():
             new_elements.extend(elements)
             elements = new_elements
         state["loading_more"] = False
-
+        
         return elements
+
+    @app.callback(
+        Output("graph", "elements"),
+        Input("hiddenTypes", "data"),
+        Input("allElements", "data"),
+        State("graph", "elements"),
+    )
+    def hide_elements(hidden_types, all_elements, displayed_elements):
+        if not all_elements:
+            return dash.no_update
+        print("all: ", len(all_elements))
+        print("displayed: ", len(displayed_elements))
+        if hidden_types:
+            els = []
+            hidden_ids = [
+                e["data"]["id"]
+                for e in all_elements
+                if "type" in e["data"] and e["data"]["type"] in hidden_types
+            ]
+            for e in all_elements:
+                d = e["data"]
+                if "id" in d and d["id"] not in hidden_ids:
+                    els.append(e)
+                if "source" in d:
+                    if (
+                        d["source"] not in hidden_ids
+                        and d["target"] not in hidden_ids
+                    ):
+                        els.append(e)
+
+            all_elements = els
+
+        new_els = []
+        all_edge_ids = set(
+            (e["data"]["source"], e["data"]["target"])
+            for e in all_elements
+            if "source" in e["data"]
+        )
+        all_node_ids = set(e["data"]["id"] for e in all_elements if "id" in e["data"])
+        displayed_edge_ids = set(
+            (e["data"]["source"], e["data"]["target"])
+            for e in displayed_elements
+            if "source" in e["data"]
+        )
+        displayed_node_ids = set(
+            e["data"]["id"] for e in displayed_elements if "id" in e["data"]
+        )
+        for e in displayed_elements:
+            d = e["data"]
+            if "id" in d and d["id"] in all_node_ids:
+                new_els.append(e)
+            if "source" in d and (d["source"], d["target"]) in all_edge_ids:
+                new_els.append(e)
+        for e in all_elements:
+            d = e["data"]
+            if "id" in d and d["id"] not in displayed_node_ids:
+                new_els.append(e)
+            if (
+                "source" in d
+                and (d["source"], d["target"]) not in displayed_edge_ids
+            ):
+                new_els.append(e)
+
+        return new_els
 
     img_stylesheet = [
         {
@@ -305,7 +417,8 @@ def run():
     )
 
     sidebar = html.Div(
-        [
+        className="overflow-auto",
+        children=[
             html.H2("CGMES Explorer", className="display-4"),
             html.Hr(),
             dbc.Button(
@@ -322,6 +435,13 @@ def run():
             ),
             html.Hr(),
             html.Div(id="output", className="small overflow-auto"),
+            html.Hr(),
+            html.H3("Visibility"),
+            html.Ul(
+                id="typeFilterList",
+                className="list-group",
+                children=[],
+            ),
         ],
         style={
             "position": "fixed",
@@ -352,6 +472,13 @@ def run():
         },
     )
 
-    app.layout = html.Div([sidebar, content])
+    app.layout = html.Div(
+        [
+            sidebar,
+            content,
+            dcc.Store(id="hiddenTypes", data=[]),
+            dcc.Store("allElements", data=elements),
+        ]
+    )
 
     app.run(debug=True, use_reloader=False)

@@ -36,6 +36,7 @@ dependencies = [
     { name = "dash" },
     { name = "dash-bootstrap-components" },
     { name = "dash-cytoscape" },
+    { name = "dash-daq" },
     { name = "loguru" },
     { name = "matplotlib" },
     { name = "networkx" },
@@ -49,6 +50,7 @@ requires-dist = [
     { name = "dash", specifier = ">=3.3.0" },
     { name = "dash-bootstrap-components", specifier = ">=2.0.4" },
     { name = "dash-cytoscape", specifier = ">=1.0.2" },
+    { name = "dash-daq", specifier = ">=0.6.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "networkx", specifier = ">=3.5" },
@@ -250,6 +252,18 @@ dependencies = [
     { name = "dash" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ea/b7/0d511af853024241dc3192bea77e4753ea606187bd2dd777a8209a5b01bb/dash_cytoscape-1.0.2.tar.gz", hash = "sha256:a61019d2184d63a2b3b5c06d056d3b867a04223a674cc3c7cf900a561a9a59aa", size = 3992593 }
+
+[[package]]
+name = "dash-daq"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dash" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/21/3d/36bc0bece8d8a9bafc26997d915b3f4c5d44f9289cc6ce07987837c015ca/dash_daq-0.6.0.tar.gz", hash = "sha256:ae2568aca470b186d6805ff2317a932a6c1a5ed879fe33e525e43810fc354dce", size = 650917 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/0f/8dd4776d5ca5b7f76d998a326d5caec722d896a3e1982cbef44fbb74e4f5/dash_daq-0.6.0-py3-none-any.whl", hash = "sha256:d155b5586f164d5d4379d5999275759c525b764a1eb5313a34abce13c50aa856", size = 675957 },
+]
 
 [[package]]
 name = "decorator"
