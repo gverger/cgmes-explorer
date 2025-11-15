@@ -418,7 +418,7 @@ def run():
     sidebar = html.Div(
         className="overflow-auto",
         children=[
-            html.H2("CGMES Explorer", className="display-4"),
+            html.H2("CGMES Explorer", className="display-8"),
             html.Hr(),
             dbc.Button(
                 "Click here!", id="resetButton", className="mb-3", color="primary"
