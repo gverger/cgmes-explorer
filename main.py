@@ -1,6 +1,7 @@
 import pickle
 from datetime import datetime
 from pathlib import Path
+import sys
 
 import networkx as nx
 import pyvis.network as pvn
@@ -96,5 +97,10 @@ def main():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        logger.error("need the zipped file as an argument")
+        exit(1)
+
+    file = sys.argv[1]
     # main()
-    visu.run()
+    visu.run(file)

@@ -1,3 +1,4 @@
+import hashlib
 import pickle
 from datetime import datetime
 from pathlib import Path
@@ -12,22 +13,29 @@ import cgmes
 import graphs
 from visu import icons
 
-grid = "small"
+# grid = "small"
 # grid = "large"
-# grid = "elia"
+grid = "elia"
+# grid = "zipped"
 max_nodes_one_way = 100
 
 
-def load_cached(pickle_filename, folder):
+def load_cached(pickle_filename, folder: Path | str):
+    folder = Path(folder)
     if Path(pickle_filename).exists():
         logger.info("loading cached file")
         with open(pickle_filename, "rb") as file:
             return pickle.load(file)
 
-    logger.info("loading folder")
-    graph = cgmes.load_folder(folder)
+    if folder.is_dir():
+        logger.info("loading folder")
+        graph = cgmes.load_folder(folder)
+    else:
+        logger.info("loading zip")
+        graph = cgmes.load_zip(folder)
+
     logger.info("saving to cache")
-    with open(f"{grid}.pickle", "wb") as file:
+    with open(pickle_filename, "wb") as file:
         pickle.dump(graph, file)
 
     return graph
@@ -41,42 +49,42 @@ def first_identifier(grid: str) -> str:
         # identifier = "_d68b6a7e-09cd-e6e3-9d08-ec5501d60acf"
         # identifier = "_b8e17237e0ca4fca9e4e285b80ab30d0",
         identifier = "_9e536b97-dd05-1718-ce43-815b1f7ffc82"
-    else:
+    elif grid == "large":
         identifier = "_426798065_ACLS"
+    else:
+        identifier = "_17086487-56ba-4979-b8de-064025a6b4da"
+        identifier = "_426798065_ACLS"
+        identifier = "_9e536b97-dd05-1718-ce43-815b1f7ffc82"
         # identifier = "_63_BV",
 
     return identifier
 
 
-def load_graph() -> cgmes.Graph:
+def md5(filepath: str | Path):
+    """
+    Compute the md5 checksum of the network file, pypowsybl version and parameters
+    :param filepath: path to a network file
+    :param parameters: parameters of the import
+    :return: the md5 string that identifies uniquely the file import
+    """
+    hash_md5 = hashlib.md5()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def load_graph(cgmes_file: str) -> cgmes.Graph:
     start = datetime.now()
-    pickle_filename = f"{grid}.pickle"
-    if grid == "small":
-        graph = load_cached(pickle_filename, "./samples/smallgrid")
 
-        # identifier = graph.identifier_for(
-        #     "20171002T0930Z_BE_EQ_2.xml", "_17086487-56ba-4979-b8de-064025a6b4da"
-        # )
-    elif grid == "elia":
-        graph = load_cached(pickle_filename, "./samples/elia")
+    tmpdir = Path("cache")
+    tmpdir.mkdir(exist_ok=True)
+    pickle_filename = tmpdir / f"{md5(cgmes_file)}.pickle"
+    graph = load_cached(pickle_filename, cgmes_file)
 
-        # identifier = graph.identifier_for(
-        #     # "20250825T1130Z_1D_ELIA_EQ_000.xml",
-        #     # "_d68b6a7e-09cd-e6e3-9d08-ec5501d60acf"
-        #     # "20250825T1130Z_ENTSO-E_EQ_BD_000.xml",
-        #     # "_b8e17237e0ca4fca9e4e285b80ab30d0",
-        #     "20250825T1130Z_1D_ELIA_EQ_000(20).xml",
-        #     "_9e536b97-dd05-1718-ce43-815b1f7ffc82",
-        # )
-    else:
-        graph = load_cached(pickle_filename, "./samples/realgrid")
-        # identifier = graph.identifier_for(
-        #     "CGMES_v2.4.15_RealGridTestConfiguration_EQ_V2.xml",
-        #     "_426798065_ACLS",
-        #     # "CGMES_v2.4.15_RealGridTestConfiguration_EQ_V2.xml", "_63_BV",
-        # )
     stop = datetime.now()
     logger.info(f"graph loaded in {stop - start}")
+    graph.graph.serialize("triples.nt", format="nt")
     return graph
 
 
@@ -106,12 +114,11 @@ def load_elements(
     logger.info("done visu")
 
     elements = []
-    print(f"already_present = {already_present}")
     for identifier, n in nodes.items():
         nodeid = identifier.split(":")[-1]
         if identifier not in already_present:
             details = graphs.node_details(graph, n)
-            logger.info("{}:\n n={}\ndetails={}", identifier, n, details)
+            logger.debug("{}:\n n={}\ndetails={}", identifier, n, details)
             node = {
                 "data": dict(
                     id=nodeid,
@@ -135,10 +142,10 @@ def load_elements(
     return elements
 
 
-def run():
-    graph = load_graph()
-    elements = load_elements(graph, first_identifier(grid))
-    print("initial elements", elements)
+def run(cgmes_file: str):
+    graph = load_graph(cgmes_file)
+    first_rdfid = graph.random_element().rdfid
+    elements = load_elements(graph, first_rdfid)
 
     cyto.load_extra_layouts()
 
@@ -228,6 +235,7 @@ def run():
         Input("graph", "tapNode"),
         Input("resetButton", "n_clicks"),
         Input("searchIdButton", "n_clicks"),
+        Input("dropdownNames", "value"),
         State("searchId", "value"),
         State("allElements", "data"),
     )
@@ -235,6 +243,7 @@ def run():
         node,
         resetButton,
         searchIdButton,
+        name,
         searchId,
         elements,
     ):
@@ -243,7 +252,12 @@ def run():
                 if state["resetId"]:
                     return load_elements(graph, state["resetId"])
 
-            return load_elements(graph, first_identifier(grid))
+        if dash.callback_context.triggered[0]["prop_id"] == "dropdownNames.value":
+            el = graph.elem_with_name(name.strip())
+            assert(el)
+            return load_elements(graph, el.rdfid)
+
+            return load_elements(graph, first_rdfid)
         if dash.callback_context.triggered[0]["prop_id"] == "searchIdButton.n_clicks":
             return load_elements(graph, searchId.strip())
 
@@ -289,8 +303,6 @@ def run():
     def hide_elements(hidden_types, all_elements, displayed_elements):
         if not all_elements:
             return dash.no_update
-        print("all: ", len(all_elements))
-        print("displayed: ", len(displayed_elements))
         if hidden_types:
             els = []
             hidden_ids = [
@@ -424,6 +436,11 @@ def run():
                     ),
                     dbc.Button("Go to ID", id="searchIdButton", color="primary"),
                 ],
+                className="mb-3",
+            ),
+            dcc.Dropdown(
+                id="dropdownNames",
+                options=list(set(e.name for e in graph.elements)),
                 className="mb-3",
             ),
             html.Hr(),

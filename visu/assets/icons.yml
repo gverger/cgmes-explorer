@@ -24,6 +24,7 @@ types:
     EquivalentInjection: "injection.png"
     PowerTransformer: "transformer.png"
     GeneratingUnit: "power-plant.png"
+    ThermalGeneratingUnit: "power-plant.png"
     RatioTapChanger: "tap-changer.png"
     TapChangerControl: "tap-changer.png"
     TopologicalIsland: "island.png"

@@ -1,11 +1,16 @@
 from dataclasses import dataclass
+from difflib import ndiff
 import functools
 from pathlib import Path
 
+from numpy.matlib import randn
+from numpy.random import rand
 import rdflib as rdf
 from loguru import logger
 from rdflib import term
 from rdflib.query import ResultRow
+
+import zipfile
 
 FILE_NS = "NSFILE_"
 
@@ -42,6 +47,13 @@ class CGMESNode:
         return rep
 
 
+@dataclass
+class Element:
+    rdfid: str
+    cim_type: str
+    name: str
+
+
 class Graph:
     def __init__(self):
         self.graph = rdf.Graph()
@@ -57,13 +69,16 @@ class Graph:
 
         # return [self.ids[identifier[identifier.index(":")+1:]]]
 
-    def load_ids(self):
-        logger.info("loading ids...")
-        self.ids = {}
+    @property
+    @functools.cache
+    def elements(self) -> list[Element]:
+        logger.info("loading elements...")
+        _elements = []
         query = """
-            SELECT ?s
+            SELECT ?s ?t ?n
             WHERE {
-            ?s rdf:type ?o.
+            ?s rdf:type ?t.
+            ?s cim:IdentifiedObject.name ?n
             }
             LIMIT 10000000
             """
@@ -73,9 +88,23 @@ class Graph:
             if not isinstance(res["s"], rdf.URIRef):
                 continue
             rdfid = self._n3(res["s"])
+            kind = res["t"]
+            name = res["n"]
             if rdfid.startswith(FILE_NS):
-                self.ids[rdfid.split(":")[1]] = rdfid
-        logger.info("{len(self.ids)} ids loaded")
+                _elements.append(Element(rdfid.split(":")[1].strip(), kind, name))
+        logger.info(f"{len(_elements)} elements loaded")
+        return _elements
+
+    def elem_with_name(self, name: str) -> Element | None:
+        logger.info(f"looking for element with name [{name}]")
+        for e in self.elements:
+            if e.name.strip() == name:
+                return e
+
+        return None
+
+    def random_element(self):
+        return self.elements[int(rand() * len(self.elements))]
 
     @functools.cache
     def properties(self, identifier: str) -> CGMESNode:
@@ -139,7 +168,6 @@ class Graph:
         depth: int,
         max_seen: int,
     ):
-        logger.info("rec {}, {}", identifier, seen)
         if depth == 0:
             return []
         if identifier in seen:
@@ -206,6 +234,20 @@ class Graph:
 
         text = identifier.removeprefix(FILE_NS)
         return text.split(":")[1]
+
+
+def load_zip(filepath: Path | str) -> Graph:
+    graph = Graph()
+    archive = zipfile.ZipFile(filepath)
+    for file in archive.filelist:
+        logger.info(f"loading {file.filename}")
+        with archive.open(file) as f:
+            graph.graph.parse(f, format="xml")
+            graph.graph.bind(
+                FILE_NS + graph.prefix_from_filename(f.name).prefix,
+                f"{f.name}#",
+            )
+    return graph
 
 
 def load_folder(cgmes_folder: Path | str) -> Graph:
