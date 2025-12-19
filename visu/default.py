@@ -13,10 +13,6 @@ import cgmes
 import graphs
 from visu import icons
 
-# grid = "small"
-# grid = "large"
-grid = "elia"
-# grid = "zipped"
 max_nodes_one_way = 100
 
 
@@ -39,25 +35,6 @@ def load_cached(pickle_filename, folder: Path | str):
         pickle.dump(graph, file)
 
     return graph
-
-
-def first_identifier(grid: str) -> str:
-    if grid == "small":
-        identifier = "_17086487-56ba-4979-b8de-064025a6b4da"
-        identifier = "_87f7002b-056f-4a6a-a872-1744eea757e3"
-    elif grid == "elia":
-        # identifier = "_d68b6a7e-09cd-e6e3-9d08-ec5501d60acf"
-        # identifier = "_b8e17237e0ca4fca9e4e285b80ab30d0",
-        identifier = "_9e536b97-dd05-1718-ce43-815b1f7ffc82"
-    elif grid == "large":
-        identifier = "_426798065_ACLS"
-    else:
-        identifier = "_17086487-56ba-4979-b8de-064025a6b4da"
-        identifier = "_426798065_ACLS"
-        identifier = "_9e536b97-dd05-1718-ce43-815b1f7ffc82"
-        # identifier = "_63_BV",
-
-    return identifier
 
 
 def md5(filepath: str | Path):

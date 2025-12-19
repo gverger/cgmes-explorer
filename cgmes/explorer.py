@@ -1,16 +1,13 @@
-from dataclasses import dataclass
-from difflib import ndiff
 import functools
+import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 
-from numpy.matlib import randn
-from numpy.random import rand
 import rdflib as rdf
 from loguru import logger
+from numpy.random import rand
 from rdflib import term
 from rdflib.query import ResultRow
-
-import zipfile
 
 FILE_NS = "NSFILE_"
 
