@@ -121,8 +121,7 @@ def load_elements(
 
 def run(cgmes_file: str):
     graph = load_graph(cgmes_file)
-    first_rdfid = graph.random_element().rdfid
-    elements = load_elements(graph, first_rdfid)
+    elements = []
 
     cyto.load_extra_layouts()
 
@@ -135,14 +134,26 @@ def run(cgmes_file: str):
         "resetId": "",
     }
 
+    # @app.callback(Output("graph", "layout", allow_duplicate=True), Input("graph", "layout"),
+    #               prevent_initial_call=True)
+    # def disable_random_layout(layout):
+    #     print(layout)
+    #     return layout | { "randomize": False }
+    #
     @app.callback(
         Output("hiddenTypes", "data"),
+        Output("graph", "layout", allow_duplicate=True),
         Input({"type": "typeFilter", "index": ALL}, "value"),
         State({"type": "typeFilter", "index": ALL}, "id"),
+        State("graph", "layout"),
+        State("hiddenTypes", "data"),
+        prevent_initial_call=True,
     )
-    def show_hide_type(filtered_type, ids):
+    def show_hide_type(filtered_type, ids, layout, hidden_types):
         res = [t["index"] for i, t in enumerate(ids) if not filtered_type[i]]
-        return res
+        if res != hidden_types:
+            layout = layout | { "randomize": False }
+        return res, layout
 
     @app.callback(
         Output("typeFilterList", "children"),
@@ -174,7 +185,8 @@ def run(cgmes_file: str):
             for t in types
         ]
 
-    @app.callback(Output("output", "children"), Input("graph", "selectedNodeData"))
+    @app.callback(Output("output", "children"), Input("graph", "selectedNodeData"),
+                  prevent_initial_call=True)
     def on_hover(data):
         if data:
             return dash.html.Pre(
@@ -189,7 +201,8 @@ def run(cgmes_file: str):
         else:
             return ""
 
-    @app.callback(Output("resetButton", "children"), Input("graph", "selectedNodeData"))
+    @app.callback(Output("resetButton", "children"), Input("graph", "selectedNodeData"),
+                  prevent_initial_call=True)
     def clickEmpty(data):
         if not data:
             state["resetId"] = ""
@@ -199,7 +212,7 @@ def run(cgmes_file: str):
 
     @app.callback(
         Output("allElements", "data"),
-        Output("graph", "layout"),
+        Output("graph", "layout", allow_duplicate=True),
         Input("graph", "tapNode"),
         Input("resetButton", "n_clicks"),
         Input("searchIdButton", "n_clicks"),
@@ -208,16 +221,15 @@ def run(cgmes_file: str):
         State("searchId", "value"),
         State("allElements", "data"),
         State("graph", "layout"),
+        prevent_initial_call=True,
     )
     def on_click(
         node, resetButton, searchIdButton, name, auto_layout, searchId, elements, layout
     ):
-        deterministic_layout = layout | {
+        deterministic_layout = initial_graph_layout | {
             "randomize": False,
         }
-        random_layout = layout | {
-            "randomize": True,
-        }
+        random_layout=initial_graph_layout
 
         if dash.callback_context.triggered[0]["prop_id"] == "autoLayoutButton.n_clicks":
             return dash.no_update, deterministic_layout | {"updateID": datetime.now()}
@@ -237,7 +249,7 @@ def run(cgmes_file: str):
 
         if not node:
             state["clicked"] = ""
-            return dash.no_update, dash.no_update
+            return dash.no_update, deterministic_layout
 
         if (
             state["clicked"] != node["data"]["id"]
@@ -245,10 +257,10 @@ def run(cgmes_file: str):
         ):
             state["clicked"] = node["data"]["id"]
             state["clicked_at"] = datetime.now()
-            return elements, dash.no_update
+            return elements, deterministic_layout
 
         if state["loading_more"]:
-            return elements, dash.no_update
+            return elements, deterministic_layout
         state["loading_more"] = True
 
         already_present = []
@@ -273,6 +285,7 @@ def run(cgmes_file: str):
         Input("hiddenTypes", "data"),
         Input("allElements", "data"),
         State("graph", "elements"),
+        prevent_initial_call=True,
     )
     def hide_elements(hidden_types, all_elements, displayed_elements):
         if not all_elements:
@@ -336,10 +349,19 @@ def run(cgmes_file: str):
     ]
 
     initial_graph_layout = {
-        "name": "cose-bilkent",
-        "idealEdgeLength": 96,
-        "randomize": True,
+        "name": "cola",
+        "edgeLength": 64,
+        "maxSimulationTime": 1000,
+        "randomize": False,
     }
+
+    # initial_graph_layout = {
+    #     "animationDuration": 200,
+    #     "name": "cose-bilkent",
+    #     "idealEdgeLength": 96,
+    #     "fit": True,
+    #     "randomize": False,
+    # }
 
     cs = cyto.Cytoscape(
         id="graph",
