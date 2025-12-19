@@ -1,7 +1,7 @@
 [project]
 name = "cgmes-explorer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Exploring CGMES files as graphs"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
