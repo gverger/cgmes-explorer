@@ -174,16 +174,6 @@ def run(cgmes_file: str):
             for t in types
         ]
 
-    @app.callback(Output("graph", "layout"), Input("autoLayoutButton", "n_clicks"))
-    def auto_layout(button):
-        return {
-            "name": "cose-bilkent",
-            "idealEdgeLength": 96,
-            "randomize": False,
-            # "quality": "proof",
-            "updateID": datetime.now(),
-        }
-
     @app.callback(Output("output", "children"), Input("graph", "selectedNodeData"))
     def on_hover(data):
         if data:
@@ -209,38 +199,45 @@ def run(cgmes_file: str):
 
     @app.callback(
         Output("allElements", "data"),
+        Output("graph", "layout"),
         Input("graph", "tapNode"),
         Input("resetButton", "n_clicks"),
         Input("searchIdButton", "n_clicks"),
         Input("dropdownNames", "value"),
+        Input("autoLayoutButton", "n_clicks"),
         State("searchId", "value"),
         State("allElements", "data"),
+        State("graph", "layout"),
     )
     def on_click(
-        node,
-        resetButton,
-        searchIdButton,
-        name,
-        searchId,
-        elements,
+        node, resetButton, searchIdButton, name, auto_layout, searchId, elements, layout
     ):
+        deterministic_layout = layout | {
+            "randomize": False,
+        }
+        random_layout = layout | {
+            "randomize": True,
+        }
+
+        if dash.callback_context.triggered[0]["prop_id"] == "autoLayoutButton.n_clicks":
+            return dash.no_update, deterministic_layout | {"updateID": datetime.now()}
+
         if dash.callback_context.triggered[0]["prop_id"] == "resetButton.n_clicks":
             if state["clicked"]:
                 if state["resetId"]:
-                    return load_elements(graph, state["resetId"])
+                    return load_elements(graph, state["resetId"]), random_layout
 
         if dash.callback_context.triggered[0]["prop_id"] == "dropdownNames.value":
             el = graph.elem_with_name(name.strip())
-            assert(el)
-            return load_elements(graph, el.rdfid)
+            assert el
+            return load_elements(graph, el.rdfid), random_layout
 
-            return load_elements(graph, first_rdfid)
         if dash.callback_context.triggered[0]["prop_id"] == "searchIdButton.n_clicks":
-            return load_elements(graph, searchId.strip())
+            return load_elements(graph, searchId.strip()), random_layout
 
         if not node:
             state["clicked"] = ""
-            return dash.no_update
+            return dash.no_update, dash.no_update
 
         if (
             state["clicked"] != node["data"]["id"]
@@ -248,10 +245,10 @@ def run(cgmes_file: str):
         ):
             state["clicked"] = node["data"]["id"]
             state["clicked_at"] = datetime.now()
-            return elements
+            return elements, dash.no_update
 
         if state["loading_more"]:
-            return elements
+            return elements, dash.no_update
         state["loading_more"] = True
 
         already_present = []
@@ -269,7 +266,7 @@ def run(cgmes_file: str):
             elements = new_elements
         state["loading_more"] = False
 
-        return elements
+        return elements, deterministic_layout
 
     @app.callback(
         Output("graph", "elements"),
@@ -338,11 +335,17 @@ def run(cgmes_file: str):
         for t in icons.Images
     ]
 
+    initial_graph_layout = {
+        "name": "cose-bilkent",
+        "idealEdgeLength": 96,
+        "randomize": True,
+    }
+
     cs = cyto.Cytoscape(
         id="graph",
         # layout={"name": "cose" },
         # layout={"name": "cose-bilkent", "idealEdgeLength": 96, "randomize": True},
-        layout={"name": "fcose", "idealEdgeLength": 96, "randomize": True},
+        layout=initial_graph_layout,
         # style={"width": "100%", "height": "1000px"},
         style={
             # "position": "absolute",
