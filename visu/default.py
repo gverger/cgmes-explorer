@@ -61,7 +61,6 @@ def load_graph(cgmes_file: str) -> cgmes.Graph:
 
     stop = datetime.now()
     logger.info(f"graph loaded in {stop - start}")
-    graph.graph.serialize("triples.nt", format="nt")
     return graph
 
 
@@ -152,7 +151,7 @@ def run(cgmes_file: str):
     def show_hide_type(filtered_type, ids, layout, hidden_types):
         res = [t["index"] for i, t in enumerate(ids) if not filtered_type[i]]
         if res != hidden_types:
-            layout = layout | { "randomize": False }
+            layout = layout | {"randomize": False}
         return res, layout
 
     @app.callback(
@@ -185,8 +184,11 @@ def run(cgmes_file: str):
             for t in types
         ]
 
-    @app.callback(Output("output", "children"), Input("graph", "selectedNodeData"),
-                  prevent_initial_call=True)
+    @app.callback(
+        Output("output", "children"),
+        Input("graph", "selectedNodeData"),
+        prevent_initial_call=True,
+    )
     def on_hover(data):
         if data:
             return dash.html.Pre(
@@ -201,14 +203,18 @@ def run(cgmes_file: str):
         else:
             return ""
 
-    @app.callback(Output("resetButton", "children"), Input("graph", "selectedNodeData"),
-                  prevent_initial_call=True)
+    @app.callback(
+        Output("resetButton", "children"),
+        Output("resetButton", "disabled"),
+        Input("graph", "selectedNodeData"),
+        prevent_initial_call=True,
+    )
     def clickEmpty(data):
         if not data:
             state["resetId"] = ""
-            return "Reset from start"
+            return "Select a node", True
         state["resetId"] = data[0]["id"]
-        return f"Reset exploration from {data[0]['label']}"
+        return f"Reset exploration from {data[0]['label']}", False
 
     @app.callback(
         Output("allElements", "data"),
@@ -229,7 +235,7 @@ def run(cgmes_file: str):
         deterministic_layout = initial_graph_layout | {
             "randomize": False,
         }
-        random_layout=initial_graph_layout
+        random_layout = initial_graph_layout
 
         if dash.callback_context.triggered[0]["prop_id"] == "autoLayoutButton.n_clicks":
             return dash.no_update, deterministic_layout | {"updateID": datetime.now()}
@@ -429,7 +435,11 @@ def run(cgmes_file: str):
             html.H2("CGMES Explorer", className="display-8"),
             html.Hr(),
             dbc.Button(
-                "Click here!", id="resetButton", className="mb-3", color="primary"
+                "Select a node",
+                id="resetButton",
+                className="mb-3",
+                color="primary",
+                disabled=True,
             ),
             dbc.InputGroup(
                 [
