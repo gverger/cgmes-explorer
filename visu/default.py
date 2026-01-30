@@ -357,7 +357,7 @@ def run(cgmes_file: str):
     initial_graph_layout = {
         "name": "cola",
         "edgeLength": 64,
-        "maxSimulationTime": 1000,
+        "maxSimulationTime": 5000,
         "randomize": False,
     }
 
