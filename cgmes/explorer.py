@@ -247,6 +247,8 @@ class GraphWithTriples(Graph):
     def __init__(self, df: pandas.DataFrame):
         super().__init__()
         logger.info("Precompute graph")
+        df = df.astype({"KEY": "category", "INSTANCE_ID": "category"})
+
         self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]]
         self.all_files = self.all_files.set_index("INSTANCE_ID")
 
@@ -255,16 +257,11 @@ class GraphWithTriples(Graph):
         self.idx = {g[0]: g[1].index.tolist() for g in df[["ID"]].groupby("ID")}
 
         df_with_link = self.df.assign(link=self.df.VALUE.isin(self.df.index))
-        print(df_with_link)
-        self.children = {
-            g[0]: set(g[1].VALUE.tolist())
-            for g in df_with_link[df_with_link.link][["VALUE"]].groupby("ID")
-        }
-        logger.info("children: len = {}", len(self.children))
-        self.parents = {
-            g[0]: set(g[1].index.tolist())
-            for g in df_with_link[df_with_link.link][["VALUE"]].groupby("VALUE")
-        }
+        df_children = df_with_link[df_with_link.link].VALUE
+        self.children = df_children.groupby(level=0).agg(set).to_dict()
+
+        df_parents = pandas.Series(df_children.index.values, index=df_children)
+        self.parents = df_parents.groupby(level=0).agg(set).to_dict()
         logger.info("Graph precomputed")
 
     @property
@@ -294,7 +291,7 @@ class GraphWithTriples(Graph):
 
         df = self.df.iloc[rows][["KEY", "VALUE", "INSTANCE_ID"]]
 
-        nodes:dict[str,CGMESNode] = {}
+        nodes: dict[str, CGMESNode] = {}
         for identifier in identifiers:
             node_df = df.loc[identifier]
             node = CGMESNode(identifier)

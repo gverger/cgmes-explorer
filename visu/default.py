@@ -22,11 +22,6 @@ max_nodes_one_way = 100
 def load_cached(pickle_filename, folder: Path | str):
     folder = Path(folder)
 
-    # logger.info("Importing with triplets")
-    # df = pandas.read_RDF([folder])
-    # print(df.head(100))
-    # df.to_csv("data.csv")
-    #
     if Path(pickle_filename).exists():
         logger.info("loading cached file")
         with open(pickle_filename, "rb") as file:
