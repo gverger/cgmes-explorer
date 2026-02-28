@@ -246,27 +246,26 @@ class Graph:
 class GraphWithTriples(Graph):
     def __init__(self, df: pandas.DataFrame):
         super().__init__()
+        logger.info("Precompute graph")
+        self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]]
+        self.all_files = self.all_files.set_index("INSTANCE_ID")
+
         self.df = df.set_index("ID")
-        self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]].set_index(
-            "INSTANCE_ID"
-        )
-        def toto(rows):
-            node = CGMESNode(identifier)
-            for row in rows.iterrows():
-                r = row[1]
-                node.id = identifier
-                if r["VALUE"] == identifier:
-                    node.add_value(r["KEY"], r["VALUE"])
-                elif r["VALUE"] in self.all_ids:
-                    node.add_child(r["KEY"], r["VALUE"])
-                else:
-                    node.add_value(r["KEY"], r["VALUE"])
-            return node
 
-        self.idx = {g[0]:
+        self.idx = {g[0]: g[1].index.tolist() for g in df[["ID"]].groupby("ID")}
 
-            g[1].index.tolist() for g in df[["ID"]].groupby("ID")}
-
+        df_with_link = self.df.assign(link=self.df.VALUE.isin(self.df.index))
+        print(df_with_link)
+        self.children = {
+            g[0]: set(g[1].VALUE.tolist())
+            for g in df_with_link[df_with_link.link][["VALUE"]].groupby("ID")
+        }
+        logger.info("children: len = {}", len(self.children))
+        self.parents = {
+            g[0]: set(g[1].index.tolist())
+            for g in df_with_link[df_with_link.link][["VALUE"]].groupby("VALUE")
+        }
+        logger.info("Graph precomputed")
 
     @property
     @functools.cache
@@ -278,7 +277,7 @@ class GraphWithTriples(Graph):
         ).dropna()
 
         return [
-            Element( r[0], r[1], r[2])
+            Element(r[0], r[1], r[2])
             for r in df[["Type", "IdentifiedObject.name"]].to_records()
         ]
 
@@ -287,55 +286,66 @@ class GraphWithTriples(Graph):
     def all_ids(self) -> set[str]:
         return set(self.df.index.values)
 
-    @functools.cache
-    def properties(self, identifier: str) -> CGMESNode:
+    def properties(self, identifiers: list[str]) -> dict[str, CGMESNode]:
+        logger.info("df for {}", identifiers)
+        rows = []
+        for identifier in identifiers:
+            rows.extend(self.idx[identifier])
 
-        if identifier.startswith(":_"):
-            identifier = identifier[2:]
-        logger.info("df for {}", identifier)
-        df = self.df.iloc[self.idx[identifier]][["KEY", "VALUE", "INSTANCE_ID"]]
+        df = self.df.iloc[rows][["KEY", "VALUE", "INSTANCE_ID"]]
+
+        nodes:dict[str,CGMESNode] = {}
+        for identifier in identifiers:
+            node_df = df.loc[identifier]
+            node = CGMESNode(identifier)
+            for row in node_df.itertuples():
+                r = row
+                node.id = identifier
+                if row.VALUE == identifier:
+                    node.add_value(r.KEY, r.VALUE)
+                elif r.VALUE in self.all_ids:
+                    node.add_child(r.KEY, r.VALUE)
+                else:
+                    node.add_value(r.KEY, r.VALUE)
+
+            instances = node_df.INSTANCE_ID.unique()
+            for file in self.all_files.loc[instances].values:
+                node.add_file(file)
+
+            nodes[identifier] = node
         logger.info("done")
-        node = CGMESNode(identifier)
-        for row in df.iterrows():
-            r = row[1]
-            node.id = identifier
-            if r["VALUE"] == identifier:
-                node.add_value(r["KEY"], r["VALUE"])
-            elif r["VALUE"] in self.all_ids:
-                node.add_child(r["KEY"], r["VALUE"])
-            else:
-                node.add_value(r["KEY"], r["VALUE"])
-
-        instances = df.INSTANCE_ID.unique()
-        for file in self.all_files.loc[instances].values:
-            node.add_file(file)
-
-        logger.info("node created: {}", node)
-        return node
+        return nodes
 
     def descendants(self, identifier: str, depth=1000, max_seen=5) -> list[str]:
         logger.info("descendants of {}...", identifier)
-        ids = set(self.df.iloc[self.idx[identifier]].VALUE) & self.idx.keys()
-        nb_asc = 1
-        while len(ids) != nb_asc:
-            break
-            nb_asc = len(ids)
-            ids = set(self.df[self.df.index.isin(ids)].VALUE) & self.all_ids
+        close = set()
+        opened = {identifier}
+        while opened:
+            current = opened.pop()
+            if current in close:
+                continue
+            close.add(current)
+            opened = opened | self.children.get(current, set())
 
+        close.remove(identifier)
         logger.info("descendants done")
-        return list(ids)
+        return list(close)
 
     def ascendants(self, identifier: str, depth=1000, max_seen=5) -> list[str]:
         logger.info("ascendants of {}...", identifier)
-        ids = set(self.df[self.df.VALUE == identifier].index)
-        nb_asc = 1
-        while len(ids) != nb_asc:
-            break
-            nb_asc = len(ids)
-            ids = set(self.df[self.df.VALUE.isin(ids)].index)
+        close = set()
+        opened = {identifier}
+        while opened:
+            current = opened.pop()
+            if current in close:
+                continue
+            close.add(current)
+            opened = opened | self.parents.get(current, set())
 
+        close.remove(identifier)
+        logger.info("descendants done")
         logger.info("ascendants done")
-        return list(ids)
+        return list(close)
 
 
 def load_zip(filepath: Path | str) -> Graph:

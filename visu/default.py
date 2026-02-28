@@ -27,11 +27,11 @@ def load_cached(pickle_filename, folder: Path | str):
     # print(df.head(100))
     # df.to_csv("data.csv")
     #
-    # if Path(pickle_filename).exists():
-    #     logger.info("loading cached file")
-    #     with open(pickle_filename, "rb") as file:
-    #         return pickle.load(file)
-    #
+    if Path(pickle_filename).exists():
+        logger.info("loading cached file")
+        with open(pickle_filename, "rb") as file:
+            return pickle.load(file)
+
     if folder.is_dir():
         logger.info("loading folder")
         graph = cgmes.load_folder(folder)
@@ -39,10 +39,10 @@ def load_cached(pickle_filename, folder: Path | str):
         logger.info("loading zip")
         graph = cgmes.load_zip(folder)
 
-    # logger.info("saving to cache")
-    # with open(pickle_filename, "wb") as file:
-    #     pickle.dump(graph, file)
-    #
+    logger.info("saving to cache")
+    with open(pickle_filename, "wb") as file:
+        pickle.dump(graph, file)
+
     return graph
 
 
@@ -95,7 +95,7 @@ def load_elements(
     all = list(set(all + already_present))
 
     logger.info("getting properties...")
-    nodes = {nid: graph.properties(nid) for nid in all}
+    nodes = graph.properties(all)
     logger.info("done visu")
 
     elements = []
@@ -103,7 +103,6 @@ def load_elements(
         nodeid = identifier
         if identifier not in already_present:
             details = graphs.node_details(graph, n)
-            logger.debug("{}:\n n={}\ndetails={}", identifier, n, details)
             node = {
                 "data": dict(
                     id=nodeid,
