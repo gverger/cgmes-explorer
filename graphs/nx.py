@@ -33,19 +33,19 @@ class NodeDetails:
 
 
 def node_details(graph: Graph, node: CGMESNode) -> NodeDetails:
-    node_type = node.props.get("rdf:type", "").removeprefix("cim:")
-    node_name = node.props.get("cim:IdentifiedObject.name", node.id.split(":")[-1])
+    node_type = node.props.get("Type", "").removeprefix("cim:")
+    node_name = node.props.get("IdentifiedObject.name", node.id)
     node_properties = {
         k: v
         for k, v in node.props.items()
-        if k != "cim:IdentifiedObject.name" and k != "rdf:type"
+        if k != "IdentifiedObject.name" and k != "Type"
     }
 
     return NodeDetails(
         id=graph.rdfid_for(node.id),
         type=node_type,
         name=node_name,
-        file=graph.file_for(node.id),
+        file=node.files[0],
         properties=node_properties,
         children=node.children,
     )

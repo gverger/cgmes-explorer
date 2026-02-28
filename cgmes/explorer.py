@@ -3,6 +3,8 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+import pandas
+import triplets
 import rdflib as rdf
 from loguru import logger
 from numpy.random import rand
@@ -23,6 +25,13 @@ class CGMESNode:
         self.id = id
         self.props: dict[str, str] = {}
         self.children: list[tuple[str, str]] = []
+        self.files: list[str] = []
+
+    def add_file(self, file: str):
+        if file in self.files:
+            return
+        self.files.append(file)
+        self.files.sort()
 
     def add_value(self, key, value):
         self.props[key] = value
@@ -226,6 +235,7 @@ class Graph:
         return fileprefix.filename
 
     def rdfid_for(self, identifier: str) -> str:
+        return identifier
         assert identifier.startswith(FILE_NS)
         assert ":" in identifier
 
@@ -233,17 +243,112 @@ class Graph:
         return text.split(":")[1]
 
 
+class GraphWithTriples(Graph):
+    def __init__(self, df: pandas.DataFrame):
+        super().__init__()
+        self.df = df.set_index("ID")
+        self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]].set_index(
+            "INSTANCE_ID"
+        )
+        def toto(rows):
+            node = CGMESNode(identifier)
+            for row in rows.iterrows():
+                r = row[1]
+                node.id = identifier
+                if r["VALUE"] == identifier:
+                    node.add_value(r["KEY"], r["VALUE"])
+                elif r["VALUE"] in self.all_ids:
+                    node.add_child(r["KEY"], r["VALUE"])
+                else:
+                    node.add_value(r["KEY"], r["VALUE"])
+            return node
+
+        self.idx = {g[0]:
+
+            g[1].index.tolist() for g in df[["ID"]].groupby("ID")}
+
+
+    @property
+    @functools.cache
+    def elements(self) -> list[Element]:
+        logger.info("loading elements from triplets...")
+        df = self.df[self.df.KEY.isin(["Type", "IdentifiedObject.name"])]
+        df = df.pivot_table(
+            values="VALUE", index=["ID"], columns=["KEY"], aggfunc="first"
+        ).dropna()
+
+        return [
+            Element( r[0], r[1], r[2])
+            for r in df[["Type", "IdentifiedObject.name"]].to_records()
+        ]
+
+    @property
+    @functools.cache
+    def all_ids(self) -> set[str]:
+        return set(self.df.index.values)
+
+    @functools.cache
+    def properties(self, identifier: str) -> CGMESNode:
+
+        if identifier.startswith(":_"):
+            identifier = identifier[2:]
+        logger.info("df for {}", identifier)
+        df = self.df.iloc[self.idx[identifier]][["KEY", "VALUE", "INSTANCE_ID"]]
+        logger.info("done")
+        node = CGMESNode(identifier)
+        for row in df.iterrows():
+            r = row[1]
+            node.id = identifier
+            if r["VALUE"] == identifier:
+                node.add_value(r["KEY"], r["VALUE"])
+            elif r["VALUE"] in self.all_ids:
+                node.add_child(r["KEY"], r["VALUE"])
+            else:
+                node.add_value(r["KEY"], r["VALUE"])
+
+        instances = df.INSTANCE_ID.unique()
+        for file in self.all_files.loc[instances].values:
+            node.add_file(file)
+
+        logger.info("node created: {}", node)
+        return node
+
+    def descendants(self, identifier: str, depth=1000, max_seen=5) -> list[str]:
+        logger.info("descendants of {}...", identifier)
+        ids = set(self.df.iloc[self.idx[identifier]].VALUE) & self.idx.keys()
+        nb_asc = 1
+        while len(ids) != nb_asc:
+            break
+            nb_asc = len(ids)
+            ids = set(self.df[self.df.index.isin(ids)].VALUE) & self.all_ids
+
+        logger.info("descendants done")
+        return list(ids)
+
+    def ascendants(self, identifier: str, depth=1000, max_seen=5) -> list[str]:
+        logger.info("ascendants of {}...", identifier)
+        ids = set(self.df[self.df.VALUE == identifier].index)
+        nb_asc = 1
+        while len(ids) != nb_asc:
+            break
+            nb_asc = len(ids)
+            ids = set(self.df[self.df.VALUE.isin(ids)].index)
+
+        logger.info("ascendants done")
+        return list(ids)
+
+
 def load_zip(filepath: Path | str) -> Graph:
-    graph = Graph()
-    archive = zipfile.ZipFile(filepath)
-    for file in archive.filelist:
-        logger.info(f"loading {file.filename}")
-        with archive.open(file) as f:
-            graph.graph.parse(f, format="xml")
-            graph.graph.bind(
-                FILE_NS + graph.prefix_from_filename(f.name).prefix,
-                f"{f.name}#",
-            )
+    graph = GraphWithTriples(pandas.read_RDF(filepath))
+    # archive = zipfile.ZipFile(filepath)
+    # for file in archive.filelist:
+    #     logger.info(f"loading {file.filename}")
+    #     with archive.open(file) as f:
+    #         graph.graph.parse(f, format="xml")
+    #         graph.graph.bind(
+    #             FILE_NS + graph.prefix_from_filename(f.name).prefix,
+    #             f"{f.name}#",
+    #         )
     return graph
 
 

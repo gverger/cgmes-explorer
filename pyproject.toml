@@ -14,4 +14,5 @@ dependencies = [
     "pyvis>=0.3.2",
     "pyyaml>=6.0.3",
     "rdflib>=7.4.0",
+    "triplets>=0.0.17",
 ]

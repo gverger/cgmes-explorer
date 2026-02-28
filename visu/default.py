@@ -2,10 +2,13 @@ import hashlib
 import pickle
 from datetime import datetime
 from pathlib import Path
+import sys
 
 import dash
-import dash_cytoscape as cyto
+import pandas
+import triplets
 import dash_bootstrap_components as dbc
+import dash_cytoscape as cyto
 from dash import ALL, Input, Output, State, dcc, html
 from loguru import logger
 
@@ -18,11 +21,17 @@ max_nodes_one_way = 100
 
 def load_cached(pickle_filename, folder: Path | str):
     folder = Path(folder)
-    if Path(pickle_filename).exists():
-        logger.info("loading cached file")
-        with open(pickle_filename, "rb") as file:
-            return pickle.load(file)
 
+    # logger.info("Importing with triplets")
+    # df = pandas.read_RDF([folder])
+    # print(df.head(100))
+    # df.to_csv("data.csv")
+    #
+    # if Path(pickle_filename).exists():
+    #     logger.info("loading cached file")
+    #     with open(pickle_filename, "rb") as file:
+    #         return pickle.load(file)
+    #
     if folder.is_dir():
         logger.info("loading folder")
         graph = cgmes.load_folder(folder)
@@ -30,10 +39,10 @@ def load_cached(pickle_filename, folder: Path | str):
         logger.info("loading zip")
         graph = cgmes.load_zip(folder)
 
-    logger.info("saving to cache")
-    with open(pickle_filename, "wb") as file:
-        pickle.dump(graph, file)
-
+    # logger.info("saving to cache")
+    # with open(pickle_filename, "wb") as file:
+    #     pickle.dump(graph, file)
+    #
     return graph
 
 
@@ -71,9 +80,9 @@ def load_elements(
     depth=1000,
 ):
     already_present = already_present or []
-    identifier = ":" + identifier
+    # identifier = ":" + identifier
     all = [
-        found.split(":")[1]
+        found
         for found in set(
             [identifier]
             + graph.descendants(identifier, depth=depth, max_seen=max_nodes_one_way)
@@ -86,12 +95,12 @@ def load_elements(
     all = list(set(all + already_present))
 
     logger.info("getting properties...")
-    nodes = {nid: graph.properties(":" + nid) for nid in all}
+    nodes = {nid: graph.properties(nid) for nid in all}
     logger.info("done visu")
 
     elements = []
     for identifier, n in nodes.items():
-        nodeid = identifier.split(":")[-1]
+        nodeid = identifier
         if identifier not in already_present:
             details = graphs.node_details(graph, n)
             logger.debug("{}:\n n={}\ndetails={}", identifier, n, details)
@@ -107,7 +116,7 @@ def load_elements(
             elements.append(node)
 
         for c in n.children:
-            childid = c[1].split(":")[1]
+            childid = c[1]
             if childid not in all:
                 continue
             if nodeid in already_present and childid in already_present:
