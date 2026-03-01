@@ -25,11 +25,11 @@ max_nodes_one_way = 100
 def load_cached(pickle_filename, folder: Path | str):
     folder = Path(folder)
 
-    if Path(pickle_filename).exists():
-        logger.info("loading cached file")
-        with open(pickle_filename, "rb") as file:
-            return pickle.load(file)
-
+    # if Path(pickle_filename).exists():
+    #     logger.info("loading cached file")
+    #     with open(pickle_filename, "rb") as file:
+    #         return pickle.load(file)
+    #
     if folder.is_dir():
         logger.info("loading folder")
         graph = cgmes.load_folder(folder)
@@ -37,9 +37,9 @@ def load_cached(pickle_filename, folder: Path | str):
         logger.info("loading zip")
         graph = cgmes.load_zip(folder)
 
-    logger.info("saving to cache")
-    with open(pickle_filename, "wb") as file:
-        pickle.dump(graph, file)
+    # logger.info("saving to cache")
+    # with open(pickle_filename, "wb") as file:
+    #     pickle.dump(graph, file)
 
     return graph
 
