@@ -1,8 +1,6 @@
 import hashlib
-import pickle
 from datetime import datetime
 from pathlib import Path
-import sys
 
 from thefuzz import fuzz
 
@@ -25,21 +23,8 @@ max_nodes_one_way = 100
 def load_cached(pickle_filename, folder: Path | str):
     folder = Path(folder)
 
-    # if Path(pickle_filename).exists():
-    #     logger.info("loading cached file")
-    #     with open(pickle_filename, "rb") as file:
-    #         return pickle.load(file)
-    #
-    if folder.is_dir():
-        logger.info("loading folder")
-        graph = cgmes.load_folder(folder)
-    else:
-        logger.info("loading zip")
-        graph = cgmes.load_zip(folder)
-
-    # logger.info("saving to cache")
-    # with open(pickle_filename, "wb") as file:
-    #     pickle.dump(graph, file)
+    logger.info("loading zip")
+    graph = cgmes.load_zip(folder)
 
     return graph
 
@@ -75,16 +60,13 @@ def load_elements(
     graph: cgmes.Graph,
     identifier: str,
     already_present: list[str] | None = None,
-    depth=1000,
 ):
     already_present = already_present or []
     # identifier = ":" + identifier
     all = [
         found
         for found in set(
-            [identifier]
-            + graph.descendants(identifier, depth=depth, max_seen=max_nodes_one_way)
-            + graph.ascendants(identifier, depth=depth, max_seen=max_nodes_one_way)
+            [identifier] + graph.descendants(identifier) + graph.ascendants(identifier)
         )
     ]
     logger.info(f"found {len(all)} nodes")
@@ -126,16 +108,6 @@ def load_elements(
 
 def run(cgmes_file: str):
     graph = load_graph(cgmes_file)
-
-    df: pandas.DataFrame = graph.elements
-    df = df.assign(
-        score=df["IdentifiedObject.name"].apply(
-            lambda n: fuzz.partial_ratio(n, "SCHIFF")
-        )
-    )
-
-    df = df[df.score > 90].sort_values(by="score", ascending=False)
-    print(df)
 
     elements = []
 
@@ -292,7 +264,7 @@ def run(cgmes_file: str):
                 already_present.append(el["data"]["id"])
 
         new_elements = load_elements(
-            graph, node["data"]["id"], already_present=already_present, depth=2
+            graph, node["data"]["id"], already_present=already_present
         )
         if new_elements:
             for n in new_elements:
@@ -384,6 +356,9 @@ def run(cgmes_file: str):
             raise PreventUpdate
 
         df: pandas.DataFrame = graph.elements
+        dup = df.lower_name.duplicated(keep="last")
+        df = df[~dup]
+
         df = df.assign(
             score=df.lower_name.apply(
                 lambda n: fuzz.partial_ratio(search_value.lower(), n)

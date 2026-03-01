@@ -48,7 +48,7 @@ def node_details(graph: Graph, node: CGMESNode) -> NodeDetails:
     }
 
     return NodeDetails(
-        id=graph.rdfid_for(node.id),
+        id=node.id,
         type=node_type,
         name=node_name,
         file=node.files,
