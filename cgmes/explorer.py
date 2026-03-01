@@ -247,22 +247,46 @@ class GraphWithTriples(Graph):
     def __init__(self, df: pandas.DataFrame):
         super().__init__()
         logger.info("Precompute graph")
-        df = df.astype({"KEY": "category", "INSTANCE_ID": "category"})
 
         self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]]
         self.all_files = self.all_files.set_index("INSTANCE_ID")
 
         self.df = df.set_index("ID")
 
-        self.idx = {g[0]: g[1].index.tolist() for g in df[["ID"]].groupby("ID")}
+        logger.info("indexing...")
+        self.idx = {}
+        for (iloc, id) in df.ID.items():
+            if id not in self.idx:
+                self.idx[id] = [iloc]
+            else:
+                self.idx[id].append(iloc)
+        logger.info("indexing done")
 
+
+        logger.info("children...")
         df_with_link = self.df.assign(link=self.df.VALUE.isin(self.df.index))
         df_children = df_with_link[df_with_link.link].VALUE
-        self.children = df_children.groupby(level=0).agg(set).to_dict()
+        self.children = {}
+        for (a,b) in df_children.items():
+            if a not in self.children:
+                self.children[a] = {b}
+            else:
+                self.children[a].add(b)
 
+        logger.info("children done")
+
+        logger.info("parents...")
         df_parents = pandas.Series(df_children.index.values, index=df_children)
-        self.parents = df_parents.groupby(level=0).agg(set).to_dict()
+        self.parents = {}
+        for (a,b) in df_parents.items():
+            if a not in self.parents:
+                self.parents[a] = {b}
+            else:
+                self.parents[a].add(b)
+        logger.info("parents done")
 
+
+        logger.info("elements...")
         self._elements = self.df[self.df.KEY.isin(["Type", "IdentifiedObject.name"])]
         self._elements = self._elements.pivot_table(
             values="VALUE", index=["ID"], columns=["KEY"], aggfunc="first"
@@ -270,6 +294,7 @@ class GraphWithTriples(Graph):
         self._elements = self._elements.assign(
             lower_name=self._elements["IdentifiedObject.name"].str.lower()
         )
+        logger.info("elements done")
 
         logger.info("Graph precomputed")
 
