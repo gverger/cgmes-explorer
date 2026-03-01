@@ -9,7 +9,7 @@ class NodeDetails:
     id: str
     type: str
     name: str
-    file: str
+    file: list[str]
     properties: dict[str, Any]
     children: list[tuple[str, str]]
 
@@ -17,7 +17,13 @@ class NodeDetails:
         return f"{self.type} - {self.name}"
 
     def __repr__(self) -> str:
-        rep = f"{self.id} (in {self.file}):\n"
+        rep = f"{self.id}:\n"
+        if len(self.file) == 1:
+            rep += f"- in file {self.file[0]}\n"
+        else:
+            rep += "- in files:\n"
+            for f in self.file:
+                rep += f"  - {f}\n"
         rep += f"- type = {self.type}\n"
         rep += f"- name = {self.name}\n"
         if len(self.properties) > 0:
@@ -45,7 +51,7 @@ def node_details(graph: Graph, node: CGMESNode) -> NodeDetails:
         id=graph.rdfid_for(node.id),
         type=node_type,
         name=node_name,
-        file=node.files[0],
+        file=node.files,
         properties=node_properties,
         children=node.children,
     )

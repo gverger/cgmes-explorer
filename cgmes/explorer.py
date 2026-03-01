@@ -249,7 +249,7 @@ class GraphWithTriples(Graph):
         logger.info("Precompute graph")
 
         self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]]
-        self.all_files = self.all_files.set_index("INSTANCE_ID")
+        self.all_files = self.all_files.set_index("INSTANCE_ID").VALUE
 
         self.df = df.set_index("ID")
 
@@ -331,7 +331,8 @@ class GraphWithTriples(Graph):
                     node.add_value(r.KEY, r.VALUE)
 
             instances = node_df.INSTANCE_ID.unique()
-            for file in self.all_files.loc[instances].values:
+            print(self.all_files.loc[instances])
+            for file in self.all_files.loc[instances]:
                 node.add_file(file)
 
             nodes[identifier] = node
