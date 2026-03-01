@@ -262,21 +262,21 @@ class GraphWithTriples(Graph):
 
         df_parents = pandas.Series(df_children.index.values, index=df_children)
         self.parents = df_parents.groupby(level=0).agg(set).to_dict()
+
+        self._elements = self.df[self.df.KEY.isin(["Type", "IdentifiedObject.name"])]
+        self._elements = self._elements.pivot_table(
+            values="VALUE", index=["ID"], columns=["KEY"], aggfunc="first"
+        ).dropna()
+        self._elements = self._elements.assign(
+            lower_name=self._elements["IdentifiedObject.name"].str.lower()
+        )
+
         logger.info("Graph precomputed")
 
     @property
     @functools.cache
     def elements(self) -> list[Element]:
-        logger.info("loading elements from triplets...")
-        df = self.df[self.df.KEY.isin(["Type", "IdentifiedObject.name"])]
-        df = df.pivot_table(
-            values="VALUE", index=["ID"], columns=["KEY"], aggfunc="first"
-        ).dropna()
-
-        return [
-            Element(r[0], r[1], r[2])
-            for r in df[["Type", "IdentifiedObject.name"]].to_records()
-        ]
+        return self._elements
 
     @property
     @functools.cache
@@ -343,6 +343,14 @@ class GraphWithTriples(Graph):
         logger.info("descendants done")
         logger.info("ascendants done")
         return list(close)
+
+    def elem_with_name(self, name: str) -> Element | None:
+        df = self.elements[self.elements["IdentifiedObject.name"] == name]
+        if len(df) == 0:
+            return None
+
+        d = df.reset_index().iloc[0].to_dict()
+        return Element(d["ID"], d["Type"], name)
 
 
 def load_zip(filepath: Path | str) -> Graph:

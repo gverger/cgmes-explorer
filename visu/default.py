@@ -4,12 +4,15 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
+from thefuzz import fuzz
+
 import dash
 import pandas
 import triplets
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from dash import ALL, Input, Output, State, dcc, html
+from dash.exceptions import PreventUpdate
 from loguru import logger
 
 import cgmes
@@ -123,6 +126,17 @@ def load_elements(
 
 def run(cgmes_file: str):
     graph = load_graph(cgmes_file)
+
+    df: pandas.DataFrame = graph.elements
+    df = df.assign(
+        score=df["IdentifiedObject.name"].apply(
+            lambda n: fuzz.partial_ratio(n, "SCHIFF")
+        )
+    )
+
+    df = df[df.score > 90].sort_values(by="score", ascending=False)
+    print(df)
+
     elements = []
 
     cyto.load_extra_layouts()
@@ -346,6 +360,40 @@ def run(cgmes_file: str):
 
         return new_els
 
+    @app.callback(
+        Output("dropdownNamesDebounce", "n_intervals"),
+        Output("dropdownNamesDebounce", "disabled"),
+        Input("dropdownNames", "search_value"),
+        prevent_initial_call=True,
+    )
+    def start_dropdown_timer(_value):
+        return 0, False
+
+    @app.callback(
+        Output("dropdownNames", "options"),
+        Input("dropdownNamesDebounce", "n_intervals"),
+        State("dropdownNames", "search_value"),
+        prevent_initial_call=True,
+    )
+    def update_options(n_interval, search_value):
+        if n_interval != 1:
+            raise PreventUpdate
+        if not search_value:
+            raise PreventUpdate
+        if len(search_value) < 2:
+            raise PreventUpdate
+
+        df: pandas.DataFrame = graph.elements
+        df = df.assign(
+            score=df.lower_name.apply(
+                lambda n: fuzz.partial_ratio(search_value.lower(), n)
+            )
+        )
+        df = df[df.score > 80].sort_values(by="score", ascending=False).iloc[0:50]
+
+        options = [o for o in df["IdentifiedObject.name"]]
+        return options
+
     img_stylesheet = [
         {
             "selector": f"node.{t}",
@@ -455,8 +503,12 @@ def run(cgmes_file: str):
             ),
             dcc.Dropdown(
                 id="dropdownNames",
-                options=list(set(e.name for e in graph.elements)),
+                # options=list(set(e.name for e in graph.elements)),
+                options=[],
                 className="mb-3",
+            ),
+            dcc.Interval(
+                id="dropdownNamesDebounce", interval=400, max_intervals=1, disabled=True
             ),
             html.Hr(),
             html.Div(id="output", className="small overflow-auto"),
