@@ -2,8 +2,6 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
-from thefuzz import fuzz
-
 import dash
 import pandas
 import triplets
@@ -347,26 +345,27 @@ def run(cgmes_file: str):
         State("dropdownNames", "search_value"),
         prevent_initial_call=True,
     )
-    def update_options(n_interval, search_value):
+    def update_options(n_interval: int, search_value: str):
         if n_interval != 1:
             raise PreventUpdate
         if not search_value:
             raise PreventUpdate
-        if len(search_value) < 2:
-            raise PreventUpdate
 
+        logger.info("filtering options...")
         df: pandas.DataFrame = graph.elements
         dup = df.lower_name.duplicated(keep="last")
         df = df[~dup]
 
+        words = search_value.strip().lower().split(" ")
+        regex = ".*".join(words)
         df = df.assign(
-            score=df.lower_name.apply(
-                lambda n: fuzz.partial_ratio(search_value.lower(), n)
-            )
+            matched=df.lower_name.str.contains(regex, regex=True),
+            start_at=df.lower_name.str.find(words[0]),
         )
-        df = df[df.score > 80].sort_values(by="score", ascending=False).iloc[0:50]
+        df = df[df.matched].sort_values(by="start_at").iloc[0:20]
 
         options = [o for o in df["IdentifiedObject.name"]]
+        logger.info("filtering options done")
         return options
 
     img_stylesheet = [
@@ -483,7 +482,7 @@ def run(cgmes_file: str):
                 className="mb-3",
             ),
             dcc.Interval(
-                id="dropdownNamesDebounce", interval=400, max_intervals=1, disabled=True
+                id="dropdownNamesDebounce", interval=300, max_intervals=1, disabled=True
             ),
             html.Hr(),
             html.Div(id="output", className="small overflow-auto"),
