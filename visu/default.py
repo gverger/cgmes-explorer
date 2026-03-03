@@ -21,7 +21,7 @@ max_nodes_one_way = 100
 def load_cached(pickle_filename, folder: Path | str):
     folder = Path(folder)
 
-    logger.info("loading zip")
+    logger.info("loading zip at {}", folder)
     graph = cgmes.load_zip(folder)
 
     return graph

@@ -120,12 +120,15 @@ class Graph:
             for row in node_df.itertuples():
                 r = row
                 node.id = identifier
-                if row.VALUE == identifier:
-                    node.add_value(r.KEY, r.VALUE)
-                elif r.VALUE in self.all_ids:
-                    node.add_child(r.KEY, r.VALUE)
+                value = row.VALUE
+                if pandas.isna(row.VALUE):
+                    value = "N/A"
+                if value == identifier:
+                    node.add_value(r.KEY, value)
+                elif value in self.all_ids:
+                    node.add_child(r.KEY, value)
                 else:
-                    node.add_value(r.KEY, r.VALUE)
+                    node.add_value(r.KEY, value)
 
             instances = node_df.INSTANCE_ID.unique()
             for file in self.all_files.loc[instances]:
