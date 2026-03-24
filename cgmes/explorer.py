@@ -49,7 +49,6 @@ class Element:
 
 class Graph:
     def __init__(self, df: pandas.DataFrame):
-        # super().__init__()
         logger.info("Precompute graph")
 
         self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]]
@@ -67,7 +66,8 @@ class Graph:
         logger.info("indexing done")
 
         logger.info("children...")
-        df_with_link = self.df.assign(link=self.df.VALUE.isin(self.df.index))
+        index_unique = self.df.index.to_frame().drop_duplicates().index
+        df_with_link = self.df.assign(link=self.df.VALUE.isin(index_unique))
         df_children = df_with_link[df_with_link.link].VALUE
         self.children = {}
         for a, b in df_children.items():
@@ -106,7 +106,6 @@ class Graph:
         return set(self.df.index.values)
 
     def properties(self, identifiers: list[str]) -> dict[str, CGMESNode]:
-        logger.info("df for {}", identifiers)
         rows = []
         for identifier in identifiers:
             rows.extend(self.idx[identifier])
