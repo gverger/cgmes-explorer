@@ -12,6 +12,7 @@ class NodeDetails:
     file: list[str]
     properties: dict[str, Any]
     children: list[tuple[str, str]]
+    neighbors: int
 
     def title(self) -> str:
         return f"{self.type} - {self.name}"
@@ -54,4 +55,5 @@ def node_details(graph: Graph, node: CGMESNode) -> NodeDetails:
         file=node.files,
         properties=node_properties,
         children=node.children,
+        neighbors= node.total_links,
     )

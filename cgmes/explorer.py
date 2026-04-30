@@ -10,6 +10,7 @@ from loguru import logger
 class CGMESNode:
     def __init__(self, id: str):
         self.id = id
+        self.total_links: int = 0
         self.props: dict[str, str] = {}
         self.children: list[tuple[str, str]] = []
         self.files: list[str] = []
@@ -36,6 +37,7 @@ class CGMESNode:
             rep += "  Children:\n"
             for child in sorted(self.children):
                 rep += f"    {child[0]}: {child[1]}\n"
+        rep += f"  Total Neighbours: {self.total_links}"
 
         return rep
 
@@ -116,6 +118,7 @@ class Graph:
         for identifier in identifiers:
             node_df = df.loc[identifier]
             node = CGMESNode(identifier)
+            node.total_links = len(self.parents.get(identifier, [])) + len(self.children.get(identifier, []))
             for row in node_df.itertuples():
                 r = row
                 node.id = identifier

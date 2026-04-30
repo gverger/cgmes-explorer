@@ -54,10 +54,38 @@ def load_graph(cgmes_file: str) -> cgmes.Graph:
     return graph
 
 
+def update_elements_link_count(els):
+    nodes = {}
+    for n in els:
+        if "id" in n["data"]:
+            n["data"]["known_links"] = 0
+            nodes[n["data"]["id"]] = n
+
+    for e in els:
+        if "source" not in e["data"]:
+            continue
+        if e["data"]["source"] in nodes:
+            nodes[e["data"]["source"]]["data"]["known_links"] += 1
+        if e["data"]["target"] in nodes:
+            nodes[e["data"]["target"]]["data"]["known_links"] += 1
+
+    for n in els:
+        if "id" not in n["data"]:
+            continue
+        data = n["data"]
+        name = data["label"].replace("\n", " ")
+        logger.info(f"update node {name}: {data['known_links']} / {data['neighbors']}")
+
+        n["data"]["description"] = f"{data['known_links']} / {data['neighbors']}\n{data['description']}"
+        n["data"]["unknown_links"] = n["data"]["neighbors"] - n["data"]["known_links"]
+
+    return els
+
+
 def load_elements(
-    graph: cgmes.Graph,
-    identifier: str,
-    already_present: list[str] | None = None,
+        graph: cgmes.Graph,
+        identifier: str,
+        already_present: list[str] | None = None,
 ):
     already_present = already_present or []
     # identifier = ":" + identifier
@@ -87,6 +115,7 @@ def load_elements(
                     label=f"{details.name}\n[{details.type}]",
                     description=f"{details}",
                     type=details.type,
+                    neighbors=details.neighbors,
                 ),
                 "classes": details.type,
             }
@@ -101,6 +130,7 @@ def load_elements(
 
             elements.append(dict(data=dict(source=nodeid, target=childid)))
 
+    update_elements_link_count(elements)
     return elements
 
 
@@ -217,7 +247,7 @@ def run(cgmes_file: str):
         prevent_initial_call=True,
     )
     def on_click(
-        node, resetButton, searchIdButton, name, auto_layout, searchId, elements, layout
+            node, resetButton, searchIdButton, name, auto_layout, searchId, elements, layout
     ):
         deterministic_layout = initial_graph_layout | {
             "randomize": False,
@@ -245,8 +275,8 @@ def run(cgmes_file: str):
             return dash.no_update, deterministic_layout
 
         if (
-            state["clicked"] != node["data"]["id"]
-            or (datetime.now() - state["clicked_at"]).total_seconds() > 0.30
+                state["clicked"] != node["data"]["id"]
+                or (datetime.now() - state["clicked_at"]).total_seconds() > 0.30
         ):
             state["clicked"] = node["data"]["id"]
             state["clicked_at"] = datetime.now()
@@ -267,8 +297,9 @@ def run(cgmes_file: str):
         if new_elements:
             for n in new_elements:
                 n["renderedPosition"] = node["renderedPosition"]
-            new_elements.extend(elements)
-            elements = new_elements
+            elements.extend(new_elements)
+
+        elements = update_elements_link_count(elements)
         state["loading_more"] = False
 
         return elements, deterministic_layout
@@ -299,36 +330,8 @@ def run(cgmes_file: str):
                         els.append(e)
 
             all_elements = els
+        return all_elements
 
-        new_els = []
-        all_edge_ids = set(
-            (e["data"]["source"], e["data"]["target"])
-            for e in all_elements
-            if "source" in e["data"]
-        )
-        all_node_ids = set(e["data"]["id"] for e in all_elements if "id" in e["data"])
-        displayed_edge_ids = set(
-            (e["data"]["source"], e["data"]["target"])
-            for e in displayed_elements
-            if "source" in e["data"]
-        )
-        displayed_node_ids = set(
-            e["data"]["id"] for e in displayed_elements if "id" in e["data"]
-        )
-        for e in displayed_elements:
-            d = e["data"]
-            if "id" in d and d["id"] in all_node_ids:
-                new_els.append(e)
-            if "source" in d and (d["source"], d["target"]) in all_edge_ids:
-                new_els.append(e)
-        for e in all_elements:
-            d = e["data"]
-            if "id" in d and d["id"] not in displayed_node_ids:
-                new_els.append(e)
-            if "source" in d and (d["source"], d["target"]) not in displayed_edge_ids:
-                new_els.append(e)
-
-        return new_els
 
     @app.callback(
         Output("dropdownNamesDebounce", "n_intervals"),
@@ -407,48 +410,55 @@ def run(cgmes_file: str):
         },
         elements=elements,
         stylesheet=[
-            {
-                "selector": "edge",
-                "style": {
-                    "curve-style": "bezier",
-                    "target-arrow-shape": "triangle",
-                },
-            },
-            {
-                "selector": "node",
-                "style": {
-                    "width": 10,
-                    "height": 10,
-                    "label": "data(label)",
-                    "text-valign": "bottom",
-                    "text-halign": "center",
-                    "text-margin-y": 3,
-                    "font-size": 8,
-                    "text-wrap": "wrap",
-                    "text-background-color": "white",
-                    "text-background-opacity": 0.5,
-                    "text-background-padding": 2,
-                    # "text-opacity": 255,
-                    "shape": "rectangle",
-                    "background-color": "white",
-                    "overlay-color": "blue",
-                    # "border-width": 1,
-                    # "border-color": "blue",
-                    # "outline-width": 2,
-                    "border-width": 1,
-                    "background-fit": "cover",
-                    "padding": "5px",
-                },
-            },
-            {
-                "selector": "node:selected",
-                "style": {
-                    "outline-color": "blue",
-                    "outline-width": 3,
-                },
-            },
-        ]
-        + img_stylesheet,
+                       {
+                           "selector": "edge",
+                           "style": {
+                               "curve-style": "bezier",
+                               "target-arrow-shape": "triangle",
+                           },
+                       },
+                       {
+                           "selector": "node",
+                           "style": {
+                               "width": 10,
+                               "height": 10,
+                               "label": "data(label)",
+                               "text-valign": "bottom",
+                               "text-halign": "center",
+                               "text-margin-y": 3,
+                               "font-size": 8,
+                               "text-wrap": "wrap",
+                               "text-background-color": "white",
+                               "text-background-opacity": 0.5,
+                               "text-background-padding": 2,
+                               # "text-opacity": 255,
+                               "shape": "rectangle",
+                               "background-color": "white",
+                               "overlay-color": "blue",
+                               # "border-width": 1,
+                               # "border-color": "blue",
+                               # "outline-width": 2,
+                               "border-width": 1,
+                               "background-fit": "cover",
+                               "padding": "5px",
+                           },
+                       },
+                       {
+                           "selector": "[unknown_links > 0]",
+                           "style": {
+                               "background-color": "orange",
+                               "background-opacity": 0.2,
+                           },
+                       },
+                       {
+                           "selector": "node:selected",
+                           "style": {
+                               "outline-color": "blue",
+                               "outline-width": 3,
+                           },
+                       },
+                   ]
+                   + img_stylesheet,
         responsive=True,
         boxSelectionEnabled=True,
         wheelSensitivity=0.3,
