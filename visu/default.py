@@ -72,11 +72,6 @@ def update_elements_link_count(els):
     for n in els:
         if "id" not in n["data"]:
             continue
-        data = n["data"]
-        name = data["label"].replace("\n", " ")
-        logger.info(f"update node {name}: {data['known_links']} / {data['neighbors']}")
-
-        n["data"]["description"] = f"{data['known_links']} / {data['neighbors']}\n{data['description']}"
         n["data"]["unknown_links"] = n["data"]["neighbors"] - n["data"]["known_links"]
 
     return els
