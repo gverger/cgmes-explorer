@@ -246,6 +246,7 @@ def run(cgmes_file: str):
     ):
         deterministic_layout = initial_graph_layout | {
             "randomize": False,
+            "fit": False,
         }
         random_layout = initial_graph_layout
 
