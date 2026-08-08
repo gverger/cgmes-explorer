@@ -251,7 +251,12 @@ def run(cgmes_file: str):
         random_layout = initial_graph_layout
 
         if dash.callback_context.triggered[0]["prop_id"] == "autoLayoutButton.n_clicks":
-            return dash.no_update, deterministic_layout | {"updateID": datetime.now()}
+            # Recompute the layout and refit the viewport after a panel resize.
+            return dash.no_update, initial_graph_layout | {
+                "randomize": False,
+                "fit": True,
+                "updateID": datetime.now(),
+            }
 
         if dash.callback_context.triggered[0]["prop_id"] == "resetButton.n_clicks":
             if state["clicked"]:
@@ -461,7 +466,7 @@ def run(cgmes_file: str):
     )
 
     sidebar = html.Div(
-        className="overflow-auto",
+        className="overflow-auto graph-sidebar",
         children=[
             html.H2("CGMES Explorer", className="display-8"),
             html.Hr(),
@@ -505,7 +510,6 @@ def run(cgmes_file: str):
             "top": 0,
             "left": 0,
             "bottom": 0,
-            "width": "40rem",
             "padding": "2rem 1rem",
             "backgroundColor": "#f8f9fa",
         },
@@ -521,8 +525,8 @@ def run(cgmes_file: str):
                 className="m-3 position-absolute top-0 end-0",
             ),
         ],
+        className="graph-content",
         style={
-            "marginLeft": "40rem",
             "marginRight": "0rem",
             "padding": "0rem",
             "height": "100vh",
@@ -532,10 +536,12 @@ def run(cgmes_file: str):
     app.layout = html.Div(
         [
             sidebar,
+            html.Div(id="panel-resizer", className="panel-resizer", role="separator"),
             content,
             dcc.Store(id="hiddenTypes", data=[]),
             dcc.Store("allElements", data=elements),
-        ]
+        ],
+        className="graph-shell",
     )
 
     app.run(debug=True, use_reloader=False)
