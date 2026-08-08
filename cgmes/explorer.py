@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pandas
-import triplets
 from loguru import logger
 
 
@@ -53,48 +52,37 @@ class Graph:
     def __init__(self, df: pandas.DataFrame):
         logger.info("Precompute graph")
 
+        df.KEY = df.KEY.astype("category")
         self.all_files = df[df.KEY == "label"][["VALUE", "INSTANCE_ID"]]
         self.all_files = self.all_files.set_index("INSTANCE_ID").VALUE
 
         self.df = df.set_index("ID")
 
         logger.info("indexing...")
-        self.idx = {}
-        for iloc, id in df.ID.items():
-            if id not in self.idx:
-                self.idx[id] = [iloc]
-            else:
-                self.idx[id].append(iloc)
+        self.idx = self.df.groupby(level=0, sort=False).indices
         logger.info("indexing done")
 
         logger.info("children...")
-        index_unique = self.df.index.to_frame().drop_duplicates().index
-        df_with_link = self.df.assign(link=self.df.VALUE.isin(index_unique))
-        df_children = df_with_link[df_with_link.link].VALUE
+        index_unique = self.df.index.unique()
+        df_children = self.df.loc[self.df.VALUE.isin(index_unique), "VALUE"]
+        logger.info("children")
         self.children = {}
-        for a, b in df_children.items():
-            if a not in self.children:
-                self.children[a] = {b}
-            else:
-                self.children[a].add(b)
-
+        for parent, child in df_children.items():
+            self.children.setdefault(parent, set()).add(child)
         logger.info("children done")
 
         logger.info("parents...")
-        df_parents = pandas.Series(df_children.index.values, index=df_children)
         self.parents = {}
-        for a, b in df_parents.items():
-            if a not in self.parents:
-                self.parents[a] = {b}
-            else:
-                self.parents[a].add(b)
+        for parent, child in df_children.items():
+            self.parents.setdefault(child, set()).add(parent)
         logger.info("parents done")
 
         logger.info("elements...")
-        self.elements = self.df[self.df.KEY.isin(["Type", "IdentifiedObject.name"])]
-        self.elements = self.elements.pivot_table(
-            values="VALUE", index=["ID"], columns=["KEY"], aggfunc="first"
-        ).dropna()
+        names = self.df[self.df.KEY == "IdentifiedObject.name"]
+        types = self.df[(self.df.KEY == "Type") & self.df.index.isin(names.index)]
+        types = types[~types.index.duplicated(keep="first")]
+        self.elements = names[["VALUE"]].rename(columns={"VALUE": "IdentifiedObject.name"})
+        self.elements["Type"] = types.VALUE
         self.elements = self.elements.assign(
             lower_name=self.elements["IdentifiedObject.name"].str.lower()
         )
