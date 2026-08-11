@@ -117,7 +117,7 @@ def load_elements(
             elements.append(node)
 
         for c in n.children:
-            childid = c[1]
+            childid = c[1].value
             if childid not in all:
                 continue
             if nodeid in already_present and childid in already_present:

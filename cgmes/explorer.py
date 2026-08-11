@@ -6,12 +6,24 @@ import pandas
 from loguru import logger
 
 
+@dataclass
+class CGMESValue:
+    value: str
+    file: str
+
+    def __repr__(self):
+        return f"{self.value}"
+
+    def html_version(self):
+        return f"<a href={self.file}>{self.value}</a>"
+
+
 class CGMESNode:
     def __init__(self, id: str):
         self.id = id
         self.total_links: int = 0
-        self.props: dict[str, str] = {}
-        self.children: list[tuple[str, str]] = []
+        self.props: dict[str, CGMESValue] = {}
+        self.children: list[tuple[str, CGMESValue]] = []
         self.files: list[str] = []
 
     def add_file(self, file: str):
@@ -20,11 +32,11 @@ class CGMESNode:
         self.files.append(file)
         self.files.sort()
 
-    def add_value(self, key, value):
-        self.props[key] = value
+    def add_value(self, key, value, instance_id):
+        self.props[key] = CGMESValue(value, instance_id)
 
-    def add_child(self, filiation, child):
-        self.children.append((filiation, child))
+    def add_child(self, filiation, child, instance_id):
+        self.children.append((filiation, CGMESValue(child, instance_id)))
 
     def __repr__(self) -> str:
         rep = f"{self.id}:\n"
@@ -107,18 +119,25 @@ class Graph:
             node_df = df.loc[identifier]
             node = CGMESNode(identifier)
             node.total_links = len(self.parents.get(identifier, [])) + len(self.children.get(identifier, []))
+
+            instances = node_df.INSTANCE_ID.unique()
+            files = self.all_files.loc[instances].to_dict()
+            for file in sorted(files.values()):
+                node.add_file(file)
+
             for row in node_df.itertuples():
                 r = row
                 node.id = identifier
                 value = row.VALUE
+                file_name = files[row.INSTANCE_ID]
                 if pandas.isna(row.VALUE):
                     value = "N/A"
                 if value == identifier:
-                    node.add_value(r.KEY, value)
+                    node.add_value(r.KEY, value, file_name)
                 elif value in self.all_ids:
-                    node.add_child(r.KEY, value)
+                    node.add_child(r.KEY, value, file_name)
                 else:
-                    node.add_value(r.KEY, value)
+                    node.add_value(r.KEY, value, file_name)
 
             instances = node_df.INSTANCE_ID.unique()
             for file in self.all_files.loc[instances]:
